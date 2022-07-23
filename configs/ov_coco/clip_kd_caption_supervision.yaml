@@ -1,0 +1,38 @@
+_BASE_: "./clip_kd_only.yaml"
+MODEL:
+  ROI_BOX_HEAD:
+    RANDOM_DROPOUT: 0.5
+    NORM_TEMP: 25.0
+    USE_BIAS: -20.0
+    IMAGE_POS_WEIGHT: 1.0
+    IMAGE_LOSS_WEIGHT: 1.0
+    WS_NUM_PROPS: 32
+  PROPOSAL_GENERATOR:
+    NAME: "CustomRPN"
+  CLIP:
+    USE_IMAGE_ENCODER: True
+  WITH_IMAGE_LABELS: True
+
+CONTEXT_MODELLING:
+  ENABLE: True
+  CAPTION_LOSS_WEIGHT: 2.0
+  TOPK: 300
+  OBJECTNESS_THR: 0.85
+  SHAPE_RATIO_THR: 0.25
+  POSITIONAL_ENCODING: True
+  BCE_TEMP: 30.0
+  BCE_POS_WEIGHT: 10.0
+  CAPTION:
+    ENABLE: True
+    NMS_THR: 0.05
+    AREA_RATIO_THR: 0.1
+    CAPS_PER_IMG: 10
+    MAX_NUM: 10
+    ADD_IMAGE_BOX: True
+    MAX_PERMUTATIONS: 4
+  QUEUE:
+    LENGTHS: [1024, 1024, 1024, 1024, 2048]
+    NAMES: ['clip_text_features', 'clip_image_features', 'clip_word_features', 'clip_patch_features', 'clip_caption_features']
+
+DATALOADER:
+  FILTER_EMPTY_ANNOTATIONS: False
