@@ -133,7 +133,7 @@ class CustomStandardROIHeads(StandardROIHeads):
             sampled_idxs, gt_classes = self._sample_proposals(
                 matched_idxs, matched_labels, targets_per_image.gt_classes
             )
-            added_instances, group_info = self.context_modeling.sample(proposals_per_image)
+            added_instances, group_info = self.context_modeling.sample(proposals_per_image, self.mask_on)
             group_infos.append(group_info)
             # sample type: -1 for topk; 0 for det; 1 for clip-img; 2 for caption
 
