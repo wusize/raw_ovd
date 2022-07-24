@@ -188,14 +188,9 @@ class ResidualAttentionBlock(nn.Module):
         self.attn_mask = self.attn_mask.to(dtype=x.dtype, device=x.device) if self.attn_mask is not None else None
         length = x.shape[0]
         if attn_masks is None:
-            attn_mask = None \
-                if self.attn_mask is None \
-                else self.attn_mask[:length, :length]
+            attn_mask = None if self.attn_mask is None else self.attn_mask[:length, :length]
         else:
-            # import pdb; pdb.set_trace()
-            attn_mask = attn_masks \
-                if self.attn_mask is None \
-                else attn_masks + self.attn_mask[None, :length, :length]
+            attn_mask = attn_masks
         return self.attn(x, x, x, need_weights=False, attn_mask=attn_mask,
                          return_tokens=return_tokens)[:2]
 
@@ -434,16 +429,13 @@ class CLIP(nn.Module):
             assert image_tokens is None
             return x
 
-    def encode_text(self, text, normalize=True, return_word_tokens=False, attn_masks=None, pe_indices=None):
+    def encode_text(self, text, normalize=True, return_word_tokens=False):
         x = self.token_embedding(text).type(self.dtype)  # [batch_size, n_ctx, d_model]
-        if pe_indices is None:
-            x = x + self.positional_embedding.type(self.dtype)[:text.shape[1]]
-        else:
-            assert x.shape[:2] == pe_indices.shape
-            x = x + self.positional_embedding.type(self.dtype)[pe_indices]
+
+        x = x + self.positional_embedding.type(self.dtype)[:text.shape[1]]
         x = x.permute(1, 0, 2)  # NLD -> LND
         x, word_tokens = self.transformer(x, return_tokens=return_word_tokens,
-                                          cls_indices=text.argmax(dim=-1), attn_masks=attn_masks)
+                                          cls_indices=text.argmax(dim=-1))
         x = x.permute(1, 0, 2)  # LND -> NLD
         x = self.ln_final(x).type(self.dtype)
 
@@ -465,15 +457,15 @@ class CLIP(nn.Module):
             return out
 
     def encode_intermediate_k(self, x, end_token_ids, stepk=2, normalize=True,
-                              return_word_tokens=False, attn_masks=None, **kwargs):
+                              return_word_tokens=False, **kwargs):
 
         num_steps = len(self.transformer.resblocks)
         for i in range(stepk, num_steps - 1):
-            x, _ = self.transformer.resblocks[i](x, attn_masks=attn_masks)
-        x, word_tokens = self.transformer.resblocks[num_steps-1](x, return_tokens=return_word_tokens,
-                                                                 cls_indices=end_token_ids,
-                                                                 attn_masks=attn_masks)
+            x, _ = self.transformer.resblocks[i](x)
+        x, word_tokens = self.transformer.resblocks[-1](x, return_tokens=return_word_tokens,
+                                                        cls_indices=end_token_ids)
 
+        # x, att = self.transformer(x)
         x = x.permute(1, 0, 2)  # LND -> NLD
         x = self.ln_final(x).type(self.dtype)
 
@@ -494,18 +486,16 @@ class CLIP(nn.Module):
             assert word_tokens is None
             return out
 
-    def encode_text_endk(self, text, stepk=2, normalize=True, attn_masks=None, pe_indices=None, **kwargs):
+    def encode_text_endk(self, text, stepk=2, normalize=True, **kwargs):
         x = self.token_embedding(text).type(self.dtype)  # [batch_size, n_ctx, d_model]
-        if pe_indices is None:
-            x = x + self.positional_embedding.type(self.dtype)[:text.shape[1]]
-        else:
-            assert x.shape[:2] == pe_indices.shape
-            x = x + self.positional_embedding.type(self.dtype)[pe_indices]
+
+        x = x + self.positional_embedding.type(self.dtype)[:text.shape[1]]
         x = x.permute(1, 0, 2)  # NLD -> LND
 
         for i in range(stepk):
-            x, _ = self.transformer.resblocks[i](x, attn_masks=attn_masks)
+            x, _ = self.transformer.resblocks[i](x)
 
+        # x, att = self.transformer(x)
         out = x.permute(1, 0, 2)  # LND -> NLD
         # x = self.ln_final(x).type(self.dtype)
 
@@ -527,7 +517,6 @@ class CLIP(nn.Module):
                                                       device=device)).type(self.dtype)
         empty_token = self.token_embedding(torch.tensor([0],
                                                         device=device)).type(self.dtype)
-
         pseudo_tokens = [torch.cat([sot_token, tokens, eot_token], dim=0) for tokens in pseudo_tokens]
 
         def _pad_sequence(tokens):
@@ -545,75 +534,19 @@ class CLIP(nn.Module):
 
         return x, torch.tensor(end_token_ids, dtype=torch.long, device=x.device)
 
-    def prepare_pseudo_text_with_mask(self, pseudo_tokens,
-                                      word_masks, context_length):
-        device = pseudo_tokens[0].device
-        sot_token = self.token_embedding(torch.tensor([self.sot_token],
-                                                      device=device)).type(self.dtype)  # [batch_size, n_ctx, d_model]
-        eot_token = self.token_embedding(torch.tensor([self.eot_token],
-                                                      device=device)).type(self.dtype)
-        empty_token = self.token_embedding(torch.tensor([0],
-                                                        device=device)).type(self.dtype)   # 1 x d_model
-
-        # pseudo_tokens = [torch.cat([sot_token, tokens, eot_token], dim=0) for tokens in pseudo_tokens]
-
-        def _pad_sequence(tokens, masks):
-            tokens = torch.cat([sot_token, tokens, eot_token], dim=0)
-            ones_padding = torch.ones_like(masks[:1])
-            masks = torch.cat([ones_padding, masks, ones_padding])
-            assert masks.shape[0] == tokens.shape[0]
-            assert context_length >= tokens.shape[0]    # TODO more options
-            if tokens.shape[0] > context_length:
-                x = tokens[list(range(context_length - 1)) + [tokens.shape[0] - 1]]
-                m = masks[list(range(context_length - 1)) + [tokens.shape[0] - 1]]
-                end_token_id = context_length - 1
-            else:
-                x = torch.cat([tokens, empty_token.repeat(
-                    context_length - tokens.shape[0], 1)], dim=0)
-                m = torch.cat([masks, ones_padding.repeat(
-                    context_length - tokens.shape[0])], dim=0)
-                end_token_id = tokens.shape[0] - 1
-            return x, m, end_token_id
-
-        x, m, end_token_ids = multi_apply(_pad_sequence, pseudo_tokens, word_masks)
-        x = torch.stack(x, dim=0)
-        m = torch.stack(m, dim=0)
-        assert m.shape[0] == x.shape[0]
-        assert m.shape[1] == context_length
-        m = m[:, None] * m[..., None]
-        attn_masks = torch.where(m > 0.0, 0.0, float('-inf'))
-        attn_masks[:, range(context_length), range(context_length)] = 0.0
-        attn_masks = attn_masks[:, None].repeat(1, self.transformer.heads, 1, 1)
-
-        return x, attn_masks.flatten(0, 1), \
-               torch.tensor(end_token_ids, dtype=torch.long, device=x.device)
-
-    def prepare_pseudo_text_tensor(self, pseudo_tokens):
-        device = pseudo_tokens.device
-        num_preds, num_words, word_dim = pseudo_tokens.shape
-        sot_token = self.token_embedding(torch.tensor([self.sot_token],
-                                                      device=device)).type(self.dtype)
-        eot_token = self.token_embedding(torch.tensor([self.eot_token],
-                                                      device=device)).type(self.dtype)
-        sot_token = sot_token.view(1, 1, word_dim).repeat(num_preds, 1, 1)
-        eot_token = eot_token.view(1, 1, word_dim).repeat(num_preds, 1, 1)
-
-        pseudo_tokens = torch.cat([sot_token, pseudo_tokens, eot_token], dim=1)
-        end_token_ids = torch.tensor([num_words + 1] * num_preds,
-                                     dtype=torch.long, device=device)
-
-        return pseudo_tokens, end_token_ids
-
     def encode_pseudo_text_endk(self, x, end_token_ids, text_pe=True,
-                                stepk=2, normalize=True, attn_masks=None, pe_indices=None):
-        if pe_indices is None:
+                                stepk=2, normalize=True):
+        if text_pe:
             x = x + self.positional_embedding.type(self.dtype)[:x.shape[1]]
         else:
-            assert x.shape[:2] == pe_indices.shape
-            x = x + self.positional_embedding.type(self.dtype)[pe_indices]
+            for i in range(x.shape[0]):
+                x[i, end_token_ids[i]:] = x[i, end_token_ids[i]:] + self.positional_embedding.type(
+                    self.dtype)[end_token_ids[i]:]
+                x[i, 0] = x[i, 0] + self.positional_embedding.type(self.dtype)[0]
+
         x = x.permute(1, 0, 2)  # NLD -> LND
         for i in range(stepk):
-            x, _ = self.transformer.resblocks[i](x, attn_masks=attn_masks)
+            x, _ = self.transformer.resblocks[i](x)
 
         out = x.permute(1, 0, 2)  # LND -> NLD
         # x = self.ln_final(x).type(self.dtype)
@@ -629,16 +562,19 @@ class CLIP(nn.Module):
         return out, x, end_token_ids
 
     def encode_pseudo_text(self, x, end_token_ids, text_pe=True, normalize=True,
-                           return_word_tokens=False, attn_masks=None, pe_indices=None):
-        if pe_indices is None:
+                           return_word_tokens=False):
+        if text_pe:
             x = x + self.positional_embedding.type(self.dtype)[:x.shape[1]]
         else:
-            assert x.shape[:2] == pe_indices.shape
-            x = x + self.positional_embedding.type(self.dtype)[pe_indices]
+            for i in range(x.shape[0]):
+                x[i, end_token_ids[i]:] = x[i, end_token_ids[i]:] + self.positional_embedding.type(
+                    self.dtype)[end_token_ids[i]:]
+                x[i, 0] = x[i, 0] + self.positional_embedding.type(self.dtype)[0]
+
         x = x.permute(1, 0, 2)  # NLD -> LND
         return self.encode_intermediate_k(x, end_token_ids,
                                           stepk=0, normalize=normalize,
-                                          return_word_tokens=return_word_tokens, attn_masks=attn_masks)
+                                          return_word_tokens=return_word_tokens)
 
     def forward(self, image, text):
         image_features = self.encode_image(image)
@@ -655,6 +591,40 @@ class CLIP(nn.Module):
 
         # shape = [global_batch_size, global_batch_size]
         return logits_per_image, logits_per_text
+
+    def prepare_pseudo_text_tensor(self, pseudo_tokens, valid_mask):
+        # valid_mask {0.0, 1.0}
+        device = pseudo_tokens.device
+        num_preds, num_words, word_dim = pseudo_tokens.shape
+        sot_token = self.token_embedding(torch.tensor([self.sot_token],
+                                                      device=device)).type(self.dtype)
+        eot_token = self.token_embedding(torch.tensor([self.eot_token],
+                                                      device=device)).type(self.dtype)
+        sot_token = sot_token.view(1, 1, word_dim).repeat(num_preds, 1, 1)
+        eot_token = eot_token.view(1, 1, word_dim).repeat(num_preds, 1, 1)
+        pseudo_tokens = torch.cat([sot_token, pseudo_tokens, eot_token], dim=1)
+        num_words += 2
+        assert valid_mask.shape == pseudo_tokens.shape[:2]
+        pseudo_tokens_flat = pseudo_tokens.view(-1, word_dim)
+        valid_mask_flat = valid_mask.view(-1)
+
+        empty_token = self.token_embedding(torch.tensor([0],
+                                                        device=device)).type(self.dtype)
+        template_flat = empty_token.view(1, word_dim).repeat(num_preds * num_words, 1)
+
+        valid_mask_zero_pad = torch.cat([torch.zeros_like(valid_mask[:, :1]),
+                                         valid_mask], dim=-1)
+        pe_indices = (valid_mask_zero_pad > 0.0).cumsum(dim=-1)[:, :-1]
+        pe_indices_flat = (pe_indices + (torch.arange(num_preds,
+                                                      device=pe_indices.device)
+                                         * num_words)[:, None]).view(-1)
+
+        template_flat[pe_indices_flat[valid_mask_flat > 0.0]] \
+            = pseudo_tokens_flat[valid_mask_flat > 0.0]
+        pseudo_tokens = template_flat.view(num_preds, num_words, word_dim)
+        end_token_ids = (valid_mask > 0.0).sum(-1).long() - 1
+
+        return pseudo_tokens, end_token_ids
 
 
 def convert_weights(model: nn.Module):

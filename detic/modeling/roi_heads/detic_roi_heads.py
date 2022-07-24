@@ -323,7 +323,7 @@ class DeticCascadeROIHeads(CascadeROIHeads):
             storage = get_event_storage()
             sample_types = torch.cat([p.sample_types for p in proposals], dim=0)
             tik = time()
-            scores, time_record = box_predictor.pred_cls_score(pseudo_words[sample_types == 0], self.clip, True)
+            scores = box_predictor.pred_cls_score(pseudo_words[sample_types == 0], self.clip)
             tok = time()
             storage.put_scalar(f'roi_head_time/pred_cls/stage_{stage}', tok - tik)
             proposal_deltas = box_predictor.bbox_pred(input_box_features[sample_types == 0])
@@ -334,8 +334,6 @@ class DeticCascadeROIHeads(CascadeROIHeads):
                                caption_pseudo_words=pseudo_words[sample_types == 2],
                                scores=scores,
                                proposal_deltas=proposal_deltas)
-            for k, v in time_record.items():
-                storage.put_scalar(f'roi_head_time/clip_text_{k}/stage_{stage}', v)
         else:
             scores = box_predictor.pred_cls_score(pseudo_words, self.clip)
             proposal_deltas = box_predictor.bbox_pred(input_box_features)

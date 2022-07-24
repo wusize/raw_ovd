@@ -10,11 +10,9 @@ from detectron2.layers import ShapeSpec, cat, nonzero_tuple
 from detectron2.modeling.roi_heads.fast_rcnn import FastRCNNOutputLayers
 from detectron2.modeling.roi_heads.fast_rcnn import fast_rcnn_inference
 from detectron2.modeling.roi_heads.fast_rcnn import _log_classification_stats
-from .utils import get_potional_indices
 from torch.cuda.amp import autocast
 from ..utils import load_class_freq, get_fed_loss_inds
 from .zero_shot_classifier import ZeroShotClassifier
-from time import time
 
 __all__ = ["CustomFastRCNNOutputLayers"]
 
@@ -326,8 +324,7 @@ class CustomFastRCNNOutputLayers(FastRCNNOutputLayers):
 
         return pseudo_words
 
-    def _drop_word(self, word_embeddings, num_heads):
-        # TODO: get positional index
+    def _drop_word(self, word_embeddings):
         p = self.word_dropout
         num_preds, num_words, _ = word_embeddings.shape
         mask = F.dropout(word_embeddings.new_ones(num_preds, num_words),
@@ -336,55 +333,34 @@ class CustomFastRCNNOutputLayers(FastRCNNOutputLayers):
         start_end_mask = torch.ones_like(mask[:, :1])
         # check empty
         is_empty = mask.sum(dim=-1) == 0.0
-        mask[is_empty, 0] = 1.0
+        mask[is_empty, 0] = 1.0       # TODO add random on this
         mask[mask > 0.0] = 1.0
+        if self.training:             # TODO discard this
+            is_full = (mask > 0.0).sum(dim=-1) == num_words
+            mask[is_full, -1] = 0.0
         # add start and end token mask
         valid_mask = torch.cat([start_end_mask, mask, start_end_mask], dim=-1)
-        pe_indices = get_potional_indices(valid_mask)
-        assert pe_indices.shape == valid_mask.shape
-        valid_mask = valid_mask[:, None] * valid_mask[..., None]   # self_attn_mask
-        attn_mask = torch.where(valid_mask > 0.0, 0.0, float('-inf'))
-        attn_mask[:, range(num_words + 2), range(num_words + 2)] = 0.0
-        attn_mask = attn_mask[:, None].repeat(1, num_heads, 1, 1)
 
-        return attn_mask.flatten(0, 1), pe_indices
+        return valid_mask
 
-    def pred_cls_score(self, pseudo_words, clip_model, record_time=False):
+    def pred_cls_score(self, pseudo_words, clip_model, **kwargs):
         if pseudo_words.shape[0] == 0:
             return pseudo_words.new_zeros(0, self.num_classes + 1)
         clip_model.eval()
-        scores = []
-        time_records = {}
         with autocast():
-            tik = time()
-            if self.word_dropout > 0.0 and self.training:
-                attn_mask, pe_indices = self._drop_word(pseudo_words.half(), clip_model.transformer.heads)
-            else:
-                attn_mask, pe_indices = None, None
-            tok = time()
-            time_records.update(drop_time=tok - tik)
+            if self.word_dropout > 0.0:
+                valid_mask = self._drop_word(pseudo_words.half())
             pseudo_text, end_token_ids = clip_model.prepare_pseudo_text_tensor(
-                pseudo_words.half())  # add start and stop token
+                pseudo_words.half(), valid_mask)  # add start and stop token
             # assert attn_mask.shape[:2] == pseudo_words.shape[:2]
-            tik = time()
-            time_records.update(prepare_time=tik - tok)
             cls_features, x, end_token_ids = \
                 clip_model.encode_pseudo_text_endk(pseudo_text, end_token_ids,
                                                    text_pe=True,
-                                                   stepk=12, normalize=True,
-                                                   attn_masks=attn_mask,
-                                                   pe_indices=pe_indices)
-            tok = time()
-            time_records.update(att_time=tok-tik)
+                                                   stepk=12, normalize=True)
             cls_features = cls_features.float()
 
         cls_scores = self.cls_score(cls_features)
-        scores.append(cls_scores)
-        scores = torch.cat(scores, dim=1)  # B x C' or B x N or B x (C'+N)
-        if record_time:
-            return scores, time_records
-        else:
-            return scores
+        return cls_scores
 
     def forward(self, x, clip_model=None):
         x = self.pre_forward(x)
