@@ -351,7 +351,8 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
 
         return valid_mask
 
-    def pred_cls_score(self, pseudo_words, clip_model, **kwargs):
+    def pred_cls_score(self, pseudo_words, **kwargs):
+        clip_model = self.clip
         if pseudo_words.shape[0] == 0:
             return pseudo_words.new_zeros(0, self.num_classes + 1)
         clip_model.eval()
