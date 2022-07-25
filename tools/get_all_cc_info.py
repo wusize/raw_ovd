@@ -10,33 +10,34 @@ if __name__ == '__main__':
     parser.add_argument('--ann', default='datasets/cc3m/Train_GCC-training.tsv')
     parser.add_argument('--save_image_path', default='datasets/cc3m/training/')
     parser.add_argument('--cat_info', default='datasets/lvis/lvis_v1_val.json')
-    parser.add_argument('--out_path', default='datasets/cc3m/train_image_info.json')
+    parser.add_argument('--out_path', default='datasets/cc3m/raw_train_image_info.json')
     parser.add_argument('--not_download_image', action='store_true')
     args = parser.parse_args()
     categories = json.load(open(args.cat_info, 'r'))['categories']
     images = []
     if not os.path.exists(args.save_image_path):
         os.makedirs(args.save_image_path)
-    f = open(args.ann)
+    f = open(args.ann, 'r', encoding='UTF-8')
     for i, line in enumerate(f):
         cap, path = line[:-1].split('\t')
         print(i, cap, path)
-        if not args.not_download_image:
-            os.system(
-                'wget {} -O {}/{}.jpg'.format(
-                    path, args.save_image_path, i + 1))
-        try:
-            img = Image.open(
-                open('{}/{}.jpg'.format(args.save_image_path, i + 1), "rb"))
-            img = np.asarray(img.convert("RGB"))
-            h, w = img.shape[:2]
-        except:
-            continue
+        # if not args.not_download_image:
+        #     os.system(
+        #         'wget {} -O {}/{}.jpg'.format(
+        #             path, args.save_image_path, i + 1))
+        # try:
+        #     img = Image.open(
+        #         open('{}/{}.jpg'.format(args.save_image_path, i + 1), "rb"))
+        #     img = np.asarray(img.convert("RGB"))
+        #     h, w = img.shape[:2]
+        # except:
+        #     continue
         image_info = {
             'id': i + 1,
             'file_name': '{}.jpg'.format(i + 1),
-            'height': h,
-            'width': w,
+            # 'height': h,
+            # 'width': w,
+            'path': path,
             'captions': [cap],
         }
         images.append(image_info)
