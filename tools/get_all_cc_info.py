@@ -2,8 +2,7 @@
 import os
 import json
 import argparse
-from PIL import Image
-import numpy as np
+from tqdm import tqdm
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -18,9 +17,9 @@ if __name__ == '__main__':
     if not os.path.exists(args.save_image_path):
         os.makedirs(args.save_image_path)
     f = open(args.ann, 'r', encoding='UTF-8')
-    for i, line in enumerate(f):
+    for i, line in tqdm(enumerate(f)):
         cap, path = line[:-1].split('\t')
-        print(i, cap, path)
+        # print(i, cap, path)
         # if not args.not_download_image:
         #     os.system(
         #         'wget {} -O {}/{}.jpg'.format(
