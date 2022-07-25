@@ -10,7 +10,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--ann', default='datasets/cc3m/train_image_info_tags.json')
     parser.add_argument('--save_image_path', default='datasets/cc3m/training/')
-    parser.add_argument('--num_threads', default=12)
+    parser.add_argument('--num_threads', default=12, type=int)
     args = parser.parse_args()
     if not os.path.exists(args.save_image_path):
         os.makedirs(args.save_image_path)
