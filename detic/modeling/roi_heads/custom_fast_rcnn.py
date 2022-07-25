@@ -13,6 +13,7 @@ from detectron2.modeling.roi_heads.fast_rcnn import _log_classification_stats
 from torch.cuda.amp import autocast
 from ..utils import load_class_freq, get_fed_loss_inds
 from .zero_shot_classifier import ZeroShotClassifier
+import random
 
 __all__ = ["CustomFastRCNNOutputLayers"]
 
@@ -333,11 +334,11 @@ class CustomFastRCNNOutputLayers(FastRCNNOutputLayers):
         start_end_mask = torch.ones_like(mask[:, :1])
         # check empty
         is_empty = mask.sum(dim=-1) == 0.0
-        mask[is_empty, 0] = 1.0       # TODO add random on this
+        # mask[is_empty, 0] = 1.0       # TODO add random on this
+        mask[is_empty,
+             random.choices(range(num_words),
+                            k=is_empty.sum().item())] = 1.0
         mask[mask > 0.0] = 1.0
-        if self.training:             # TODO discard this
-            is_full = (mask > 0.0).sum(dim=-1) == num_words
-            mask[is_full, -1] = 0.0
         # add start and end token mask
         valid_mask = torch.cat([start_end_mask, mask, start_end_mask], dim=-1)
 

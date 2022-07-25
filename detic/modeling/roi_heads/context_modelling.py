@@ -323,7 +323,10 @@ class ContextModelling(nn.Module):
                          training=self.training)
         # check empty
         is_empty = mask.sum(dim=-1) == 0.0
-        mask[is_empty, 0] = 1.0
+        # mask[is_empty, 0] = 1.0
+        mask[is_empty,
+             random.choices(range(num_words),
+                            k=is_empty.sum().item())] = 1.0
         mask = mask > 0.0
 
         return mask
