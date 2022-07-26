@@ -193,7 +193,7 @@ class CustomRCNN(GeneralizedRCNN):
             batched_shape = (math.ceil(batched_shape[0] / 2),
                              math.ceil(batched_shape[1] / 2))
             new_image = F.interpolate(images.tensor[i:i+1],  size=batched_shape,
-                                      mode='bilinear')
+                                      mode='bilinear', align_corners=False)
             image_tensors.append(new_image)
 
         if len(image_tensors) > 0:
