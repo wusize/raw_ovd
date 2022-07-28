@@ -199,5 +199,5 @@ def add_detic_config(cfg):
     _C.CONTEXT_MODELLING.QUEUE.NAMES = ['clip_text_features', 'clip_image_features',
                                         'clip_word_features', 'clip_patch_features',
                                         'clip_caption_features']
-    _C.MODEL.SAVE_PROPOSALS = True
+    _C.MODEL.SAVE_PROPOSALS = False
     _C.SAVE_DEBUG_PATH = 'output/save_debug/'
