@@ -430,6 +430,9 @@ class ContextModelling(nn.Module):
         similarity_matrix_0[:, :num_queries][label_mask] = float('-inf')
         if global_image_feature_img_ids.shape[0] > 0:
             img_id_mask_0 = img_ids[:, None] == global_image_feature_img_ids[None]
+            if similarity_matrix_0[:, num_queries:].shape != img_id_mask_0.shape:   # TODO: fix it
+                print(f'bug emerges: {similarity_matrix_0.shape}, {img_id_mask_0.shape}', flush=True)
+                return self.kd_jump_over_error(device=device)
             similarity_matrix_0[:, num_queries:][img_id_mask_0] = float('-inf')
         # image features as queries
         text_keys = torch.cat([clip_text_features, global_clip_text_features[..., :-1]], dim=0)
@@ -437,6 +440,9 @@ class ContextModelling(nn.Module):
         similarity_matrix_1[:, :num_queries][label_mask] = float('-inf')
         if global_text_feature_img_ids.shape[0] > 0:
             img_id_mask_1 = img_ids[:, None] == global_text_feature_img_ids[None]
+            if similarity_matrix_1[:, num_queries:].shape != img_id_mask_1.shape:   # TODO: fix it
+                print(f'bug emerges: {similarity_matrix_1.shape}, {img_id_mask_1.shape}', flush=True)
+                return self.kd_jump_over_error(device=device)
             similarity_matrix_1[:, num_queries:][img_id_mask_1] = float('-inf')
 
         label = torch.arange(num_queries).to(device)
@@ -500,12 +506,18 @@ class ContextModelling(nn.Module):
             similarity_matrix_0 = self.token_temp * clip_word_features @ image_keys.T
             if global_patch_feature_img_ids.shape[0] > 0:
                 img_id_mask_0 = img_ids[:, None] == global_patch_feature_img_ids[None]
+                if similarity_matrix_0[:, num_queries:].shape != img_id_mask_0.shape:  # TODO: fix it
+                    print(f'bug emerges: {similarity_matrix_0.shape}, {img_id_mask_0.shape}', flush=True)
+                    return self.kd_jump_over_error(device=device)
                 similarity_matrix_0[:, num_queries:][img_id_mask_0] = float('-inf')
             # image features as queries
             text_keys = torch.cat([clip_word_features, global_clip_word_features[..., :-1]])
             similarity_matrix_1 = self.token_temp * clip_patch_features @ text_keys.T
             if global_word_feature_img_ids.shape[0] > 0:
                 img_id_mask_1 = img_ids[:, None] == global_word_feature_img_ids[None]
+                if similarity_matrix_1[:, num_queries:].shape != img_id_mask_1.shape:  # TODO: fix it
+                    print(f'bug emerges: {similarity_matrix_1.shape}, {img_id_mask_1.shape}', flush=True)
+                    return self.kd_jump_over_error(device=device)
                 similarity_matrix_1[:, num_queries:][img_id_mask_1] = float('-inf')
             labels = torch.arange(num_queries, device=device)
             label_mask = box_ids[None] == box_ids[:, None]
@@ -660,3 +672,14 @@ class ContextModelling(nn.Module):
         self.queues.dequeue_and_enqueue(queue_update)
 
         return losses
+
+    def kd_jump_over_error(self, device):
+        queues_update = dict(clip_text_features=-torch.ones(1, 513).to(device),
+                             clip_image_features=-torch.ones(1, 513).to(device))
+        losses = dict(contrast_loss=torch.zeros(1).sum().to(device))
+        if self.checkboard_cfg.LOCAL_CORRESPONDENCE:
+            queues_update.update(clip_word_features=-torch.ones(1, 513).to(device),
+                                 clip_patch_features=-torch.ones(1, 513).to(device))
+            losses.update(token_loss=torch.zeros(1).sum().to(device))
+
+        return losses, queues_update
