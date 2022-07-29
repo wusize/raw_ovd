@@ -18,10 +18,12 @@ class UCLContextModelling(ContextModelling):
             class_embeddings = torch.tensor(
                 np.load(class_embeddings), dtype=torch.float32)
             self.register_buffer('class_embeddings', class_embeddings, persistent=False)
+            assert self.num_classes == class_embeddings.shape[0]
 
         self.caption_loss = SoftTargetCrossEntropy()
 
     def caption_contrast(self, caption_normed_boxes, predictions, clip_model, image_info):
+        image_label_info = image_info.get('image_label_info', None)
         clip_model.eval()
         batch_size = len(caption_normed_boxes)
         caption_pseudo_words = predictions.pop('caption_pseudo_words')
@@ -114,12 +116,33 @@ class UCLContextModelling(ContextModelling):
                                                      global_clip_caption_features[..., -1]], dim=0)
 
         # matrix 0
-        similarity_matrix_0 = self.ce_temp * contrast_clip_text_features @ contrast_clip_caption_features.T
         label_matrix_0 = (contrast_clip_text_image_ids[:, None] == contrast_clip_caption_image_ids[None]).float()
 
+        if image_label_info is not None:
+            contrast_clip_caption_features = torch.cat([contrast_clip_caption_features,
+                                                        self.class_embeddings], dim=0)
+            image_class_features = image_label_info['image_class_features']
+            contrast_clip_text_features = torch.cat([contrast_clip_text_features,
+                                                     image_class_features], dim=0)
+            image_labels = image_label_info['image_labels']
+            num_images = len(image_class_features)
+            assert num_images == len(image_labels)
+
+            extra_label_matrix = label_matrix_0.new_zeros.zeros(num_images, self.num_classes)
+            for i in range(num_images):
+                extra_label_matrix[i, image_labels[i]] = 1.0
+
+            label_template = label_matrix_0.new_zeros(label_matrix_0.shape[0] + num_images,
+                                                      label_matrix_0.shape[1] + self.num_classes)
+            label_template[:-num_images, :-self.num_classes] = label_matrix_0
+            label_template[-num_images:, -self.num_classes:] = extra_label_matrix
+            label_matrix_0 = label_template
+
         # matrix 1
+        label_matrix_1 = label_matrix_0.T
+
+        similarity_matrix_0 = self.ce_temp * contrast_clip_text_features @ contrast_clip_caption_features.T
         similarity_matrix_1 = self.ce_temp * contrast_clip_caption_features @ contrast_clip_text_features.T
-        label_matrix_1 = (contrast_clip_caption_image_ids[:, None] == contrast_clip_text_image_ids[None]).float()
 
         # mask invalid captions
         if len(invalid_caps) > 0:

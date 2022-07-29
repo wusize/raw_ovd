@@ -332,7 +332,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
 
         return pseudo_words
 
-    def _drop_word(self, word_embeddings):
+    def _drop_word(self, word_embeddings, check_full=True):
         p = self.word_dropout
         num_preds, num_words, _ = word_embeddings.shape
         mask = F.dropout(word_embeddings.new_ones(num_preds, num_words),
@@ -343,7 +343,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         is_empty = mask.sum(dim=-1) == 0.0
         mask[is_empty, 0] = 1.0       # TODO add random on this
         mask[mask > 0.0] = 1.0
-        if self.training:             # TODO discard this
+        if self.training and check_full:             # TODO discard this
             is_full = (mask > 0.0).sum(dim=-1) == num_words
             mask[is_full, -1] = 0.0
         # add start and end token mask
@@ -370,6 +370,25 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
 
         cls_scores = self.cls_score(cls_features)
         return cls_scores
+
+    def pred_cls_feature_all(self, pseudo_words, **kwargs):
+        clip_model = self.clip
+        if pseudo_words.shape[0] == 0:
+            return pseudo_words.new_zeros(0, self.num_classes + 1)
+        clip_model.eval()
+        with autocast():
+            if self.word_dropout > 0.0:
+                valid_mask = self._drop_word(pseudo_words.half(), check_full=False)
+            pseudo_text, end_token_ids = clip_model.prepare_pseudo_text_tensor(
+                pseudo_words.half(), valid_mask)  # add start and stop token
+            # assert attn_mask.shape[:2] == pseudo_words.shape[:2]
+            cls_features = \
+                clip_model.encode_pseudo_text(pseudo_text, end_token_ids,
+                                              text_pe=True, normalize=True,
+                                              return_word_tokens=False)
+            cls_features = cls_features.float()
+
+        return cls_features
 
     def forward(self, x):
         x = self.pre_forward(x)

@@ -82,8 +82,10 @@ class CustomRes5ROIHeads(Res5ROIHeads):
             storage.put_scalar("time/detector_forward", np.float32(tok - tik))
 
             if self.cfg.MODEL.WITH_IMAGE_LABELS:
-                image_pseudo_words = self.image_label_loss(resized_image_info)
-                image_info.update(image_pseudo_words=image_pseudo_words)
+                image_label_info = self.image_label_info(resized_image_info)
+            else:
+                image_label_info = None
+            image_info.update(image_label_info=image_label_info)
 
             # TODO contrastive learning
             if self.context_modeling_cfg.ENABLE:
@@ -182,7 +184,9 @@ class CustomRes5ROIHeads(Res5ROIHeads):
         box_features = self.box_predictor.pre_forward(
             box_features.mean(dim=[2, 3]))
         pseudo_words = self.box_predictor.pred_words(box_features)  # Nx1024 -> Nx4x512
+        image_class_features = self.box_predictor.pred_cls_feature_all(pseudo_words)
 
-        return pseudo_words
+        image_labels = resized_image_info['image_labels']
 
-
+        return dict(image_class_features=image_class_features,
+                    image_labels=image_labels)
