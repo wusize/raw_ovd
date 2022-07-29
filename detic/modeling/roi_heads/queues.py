@@ -29,6 +29,10 @@ class Queues(nn.Module):
     def dequeue_and_enqueue(self, queue_update):
         for k, feat in queue_update.items():
             queue_length = self.queue_lengths[k]
+            feat_valid = feat[:, -1] >= 0
+            if feat_valid.sum() == 0:
+                continue
+            feat = feat[feat_valid]
             feat = feat[:queue_length]
             in_length = feat.shape[0]
             queue_value = getattr(self, k)
