@@ -37,7 +37,7 @@ class CustomRes5ROIHeads(Res5ROIHeads):
         self.context_modeling_cfg = cfg.CONTEXT_MODELLING
         self.cfg = cfg
 
-        self.context_modeling = ContextModelling(self.context_modeling_cfg,
+        self.context_modeling = ContextModelling(cfg=self.context_modeling_cfg,
                                                  num_words=self.box_predictor.num_words,
                                                  word_embed_dim=self.box_predictor.word_embed_dim,
                                                  word_dropout=self.box_predictor.word_dropout)
