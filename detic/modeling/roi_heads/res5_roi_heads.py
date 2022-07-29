@@ -11,7 +11,9 @@ from detectron2.utils.events import get_event_storage
 from detectron2.modeling.proposal_generator.proposal_utils \
     import add_ground_truth_to_proposals
 from detectron2.structures import pairwise_iou
-from detic.modeling.roi_heads.context_modelling import ContextModelling
+# from detic.modeling.roi_heads.context_modelling import ContextModelling
+from detic.modeling.roi_heads.ucl_context_modelling \
+    import UCLContextModelling as ContextModelling
 from time import time
 
 
@@ -79,18 +81,16 @@ class CustomRes5ROIHeads(Res5ROIHeads):
             # print('detector loss:', tok - tik)
             storage.put_scalar("time/detector_forward", np.float32(tok - tik))
 
+            if self.cfg.MODEL.WITH_IMAGE_LABELS:
+                image_pseudo_words = self.image_label_loss(resized_image_info)
+                image_info.update(image_pseudo_words=image_pseudo_words)
+
             # TODO contrastive learning
             if self.context_modeling_cfg.ENABLE:
                 losses.update(self.context_modeling.get_loss(group_infos,
                                                              predictions, clip_images,
                                                              self.box_predictor.clip, image_info))
                 storage.put_scalar("time/contrast_learning", np.float32(time() - tok))
-
-            if self.cfg.MODEL.WITH_IMAGE_LABELS:
-                loss = self.image_label_loss(resized_image_info)
-                if loss is None:
-                    loss = list(losses.values())[0] * 0.0
-                losses.update(image_label_loss=loss)
 
             return proposals, losses
         else:
@@ -162,13 +162,12 @@ class CustomRes5ROIHeads(Res5ROIHeads):
 
         return predictions
 
-    def image_label_loss(self, resized_image_info):
+    def image_label_info(self, resized_image_info):
         proposals = resized_image_info['proposals']
         num_imgs = len(proposals)
         if num_imgs == 0:
             return None
         proposals = [p[:self.cfg.MODEL.ROI_BOX_HEAD.WS_NUM_PROPS] for p in proposals]
-        image_labels = resized_image_info['image_labels']
         max_size_proposals = []
         for p in proposals:
             assert len(p) > 0
@@ -183,17 +182,7 @@ class CustomRes5ROIHeads(Res5ROIHeads):
         box_features = self.box_predictor.pre_forward(
             box_features.mean(dim=[2, 3]))
         pseudo_words = self.box_predictor.pred_words(box_features)  # Nx1024 -> Nx4x512
-        scores = self.box_predictor.pred_cls_score(pseudo_words)[..., :-1]
-        targets = torch.zeros_like(scores)
-        loss_weights = torch.ones_like(scores)
-        for i in range(num_imgs):
-            targets[i, image_labels[i]] = 1.0
-            loss_weights[i, image_labels[i]] = self.cfg.MODEL.ROI_BOX_HEAD.IMAGE_POS_WEIGHT
 
-        loss = F.binary_cross_entropy_with_logits(scores, targets, reduction='none')
-        loss = (loss * loss_weights).sum() / (loss_weights.sum() + 1e-12)
+        return pseudo_words
 
-        if loss > 100.0:
-            loss = loss * 0.0
 
-        return loss * self.cfg.MODEL.ROI_BOX_HEAD.IMAGE_LOSS_WEIGHT
