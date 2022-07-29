@@ -129,7 +129,7 @@ class UCLContextModelling(ContextModelling):
             num_images = len(image_class_features)
             assert num_images == len(image_labels)
 
-            extra_label_matrix = label_matrix_0.new_zeros.zeros(num_images, self.num_classes)
+            extra_label_matrix = label_matrix_0.new_zeros(num_images, self.num_classes)
             for i in range(num_images):
                 extra_label_matrix[i, image_labels[i]] = 1.0
 
