@@ -532,7 +532,8 @@ class ContextModelling(nn.Module):
         caption_features = clip_model.encode_text(tokens, normalize=True).float()
         return caption_features, num_captions_per_image
 
-    def caption_contrast(self, caption_normed_boxes, predictions, clip_model, image_info):
+    def caption_contrast(self, caption_normed_boxes, predictions, clip_model, image_info,
+                         *args, **kwargs):
         clip_model.eval()
         batch_size = len(caption_normed_boxes)
         caption_pseudo_words = predictions.pop('caption_pseudo_words')
@@ -639,7 +640,7 @@ class ContextModelling(nn.Module):
 
         return dict(caption_loss=loss * self.cfg.CAPTION_LOSS_WEIGHT), queue_update
 
-    def get_loss(self, group_infos, predictions, clip_images, clip_model, image_info):
+    def get_loss(self, group_infos, predictions, clip_images, clip_model, image_info, *args, **kwargs):
         losses = dict()
         queue_update = dict()
         if self.checkboard_cfg.ENABLE:
@@ -651,7 +652,8 @@ class ContextModelling(nn.Module):
 
         if self.caption_cfg.ENABLE:
             loss_caption, queue_caption = self.caption_contrast([g['caption_normed_boxes'] for g in group_infos],
-                                                                predictions, clip_model, image_info)
+                                                                predictions, clip_model, image_info,
+                                                                *args, **kwargs)
             losses.update(loss_caption)
             queue_update.update(queue_caption)
 

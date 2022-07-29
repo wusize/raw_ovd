@@ -22,8 +22,9 @@ class UCLContextModelling(ContextModelling):
 
         self.caption_loss = SoftTargetCrossEntropy()
 
-    def caption_contrast(self, caption_normed_boxes, predictions, clip_model, image_info):
-        image_label_info = image_info.get('image_label_info', None)
+    def caption_contrast(self, caption_normed_boxes, predictions, clip_model, image_info,
+                         image_label_info=None,
+                         *args, **kwargs):
         clip_model.eval()
         batch_size = len(caption_normed_boxes)
         caption_pseudo_words = predictions.pop('caption_pseudo_words')

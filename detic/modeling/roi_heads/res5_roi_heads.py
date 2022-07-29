@@ -6,7 +6,6 @@ from detectron2.config import configurable
 from detectron2.layers import ShapeSpec
 from detectron2.modeling.roi_heads.roi_heads import ROI_HEADS_REGISTRY, Res5ROIHeads
 from .detic_fast_rcnn import DeticFastRCNNOutputLayers
-from torch.nn import functional as F
 from detectron2.utils.events import get_event_storage
 from detectron2.modeling.proposal_generator.proposal_utils \
     import add_ground_truth_to_proposals
@@ -85,13 +84,13 @@ class CustomRes5ROIHeads(Res5ROIHeads):
                 image_label_info = self.image_label_info(resized_image_info)
             else:
                 image_label_info = None
-            image_info.update(image_label_info=image_label_info)
 
             # TODO contrastive learning
             if self.context_modeling_cfg.ENABLE:
                 losses.update(self.context_modeling.get_loss(group_infos,
                                                              predictions, clip_images,
-                                                             self.box_predictor.clip, image_info))
+                                                             self.box_predictor.clip, image_info,
+                                                             image_label_info=image_label_info))
                 storage.put_scalar("time/contrast_learning", np.float32(time() - tok))
 
             return proposals, losses
