@@ -201,3 +201,6 @@ def add_detic_config(cfg):
                                         'clip_caption_features']
     _C.MODEL.SAVE_PROPOSALS = False
     _C.SAVE_DEBUG_PATH = 'output/save_debug/'
+
+    _C.CONTEXT_MODELLING.NUM_CLASSES = 80     # FOR UCL
+    _C.CONTEXT_MODELLING.CLASS_EMBEDDINGS = 'datasets/metadata/coco_clip_a+cname.npy'

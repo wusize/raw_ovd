@@ -10,10 +10,11 @@ from torch.cuda.amp import autocast
 
 # TODO: support caption
 class UCLContextModelling(ContextModelling):
-    def __init__(self, num_classes=80, class_embeddings=None, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super(UCLContextModelling, self).__init__(*args, **kwargs)
-        self.num_classes = num_classes
-        if class_embeddings is not None:
+        self.num_classes = self.cfg.NUM_CLASSES
+        class_embeddings = self.cfg.CLASS_EMBEDDINGS
+        if class_embeddings != '':
             class_embeddings = torch.tensor(
                 np.load(class_embeddings), dtype=torch.float32)
             self.register_buffer('class_embeddings', class_embeddings, persistent=False)
@@ -92,6 +93,7 @@ class UCLContextModelling(ContextModelling):
             caption_valid = torch.cat(caption_valid)
             clip_caption_features = torch.cat(clip_caption_features_list)
             caption_img_ids = torch.cat(caption_img_ids)
+        invalid_caps = torch.where(caption_valid < 1.0)[0]
         pred_image_ids = torch.tensor([k for num_perms, k in zip(num_perms_per_image,
                                                                  image_info.keys()) for _ in range(num_perms)],
                                       device=device)
@@ -111,15 +113,27 @@ class UCLContextModelling(ContextModelling):
         contrast_clip_caption_image_ids = torch.cat([caption_img_ids,
                                                      global_clip_caption_features[..., -1]], dim=0)
 
-
         # matrix 0
         similarity_matrix_0 = self.ce_temp * contrast_clip_text_features @ contrast_clip_caption_features.T
         label_matrix_0 = (contrast_clip_text_image_ids[:, None] == contrast_clip_caption_image_ids[None]).float()
-        loss_0 = self.caption_loss(similarity_matrix_0, label_matrix_0)
 
         # matrix 1
         similarity_matrix_1 = self.ce_temp * contrast_clip_caption_features @ contrast_clip_text_features.T
         label_matrix_1 = (contrast_clip_caption_image_ids[:, None] == contrast_clip_text_image_ids[None]).float()
+
+        # mask invalid captions
+        if len(invalid_caps) > 0:
+            # matrix 0
+            invalid_label_matrix_0 = label_matrix_0[:, invalid_caps]
+            invalid_mask_0 = torch.where(invalid_label_matrix_0 > 0.0, self.ce_temp, -self.ce_temp)
+            similarity_matrix_0[:, invalid_caps] = invalid_mask_0
+
+            # matrix 1
+            invalid_label_matrix_1 = label_matrix_1[invalid_caps]
+            invalid_mask_1 = torch.where(invalid_label_matrix_1 > 0.0, self.ce_temp, -self.ce_temp)
+            similarity_matrix_1[invalid_caps] = invalid_mask_1
+
+        loss_0 = self.caption_loss(similarity_matrix_0, label_matrix_0)
         loss_1 = self.caption_loss(similarity_matrix_1, label_matrix_1)
 
         loss = loss_0 * 0.5 + loss_1 * 0.5
