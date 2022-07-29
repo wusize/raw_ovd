@@ -50,8 +50,8 @@ def process_single_image_groups(group_info, device):
 
     seq_level_origin_split = [sum([len(grp) for grp in ori]) for ori in normed_boxes]
     seq_level_group_split = [len(grp) for ori in normed_boxes for grp in ori]
-    assert sum(seq_level_group_split) == sum(seq_level_origin_split), f'{seq_level_group_split},' \
-                                                                      f'{seq_level_origin_split}'
+    if sum(seq_level_group_split) != sum(seq_level_origin_split):
+        print(f'{seq_level_group_split}, {seq_level_origin_split}', flush=True)
 
     normed_boxes = torch.cat([torch.cat(grp, dim=0)
                               for ori in normed_boxes for grp in ori], dim=0).to(device)
@@ -385,6 +385,10 @@ class ContextModelling(nn.Module):
         normed_boxes_split_by_perms = [normed_boxes_.split(preds_split_by_perms_, dim=0)
                                        for normed_boxes_, preds_split_by_perms_
                                        in zip(normed_boxes, preds_split_by_perms)]
+        img_ids = [torch.tensor(len(b) * [img_id])
+                   for b, img_id in zip(preds_split_by_perms,
+                                        image_info.keys())]
+        img_ids = torch.cat(img_ids).to(device).float()
         # torch.cat(normed_boxes).split(preds_split_by_perms, dim=0)
         preds_split_by_perms = [p for b in preds_split_by_perms for p in b]
         word_sequences = pseudo_words.split(preds_split_by_perms, dim=0)
@@ -417,10 +421,6 @@ class ContextModelling(nn.Module):
         label_mask = seq_ids[None] == seq_ids[:, None]
         label_mask.fill_diagonal_(False)
         # mask same synced_img
-        img_ids = [torch.tensor(sum(b) * [img_id])
-                   for b, img_id in zip(seqs_split_by_group,
-                                        image_info.keys())]
-        img_ids = torch.cat(img_ids).to(device)
         global_text_feature_img_ids = global_clip_text_features[..., -1]
         global_image_feature_img_ids = global_clip_image_features[..., -1]
 
