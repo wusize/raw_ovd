@@ -50,6 +50,8 @@ def process_single_image_groups(group_info, device):
 
     seq_level_origin_split = [sum([len(grp) for grp in ori]) for ori in normed_boxes]
     seq_level_group_split = [len(grp) for ori in normed_boxes for grp in ori]
+    assert sum(seq_level_group_split) == sum(seq_level_origin_split), f'{seq_level_group_split},' \
+                                                                      f'{seq_level_origin_split}'
 
     normed_boxes = torch.cat([torch.cat(grp, dim=0)
                               for ori in normed_boxes for grp in ori], dim=0).to(device)
@@ -416,7 +418,7 @@ class ContextModelling(nn.Module):
         label_mask.fill_diagonal_(False)
         # mask same synced_img
         img_ids = [torch.tensor(sum(b) * [img_id])
-                   for b, img_id in zip(seqs_split_split_by_origin,
+                   for b, img_id in zip(seqs_split_by_group,
                                         image_info.keys())]
         img_ids = torch.cat(img_ids).to(device)
         global_text_feature_img_ids = global_clip_text_features[..., -1]
