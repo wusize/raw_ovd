@@ -681,7 +681,7 @@ class ContextModelling(nn.Module):
         if 'contrast_loss' in losses:
             losses['contrast_loss'] = losses['contrast_loss'] * 0.0
         else:
-            losses['contrast_loss'] = pseudo_words[0, 0] * 0.0
+            losses['contrast_loss'] = pseudo_words[0, 0, 0] * 0.0
 
         if self.checkboard_cfg.LOCAL_CORRESPONDENCE:
             for k in ['clip_word_features', 'clip_patch_features']:
@@ -690,6 +690,6 @@ class ContextModelling(nn.Module):
             if 'token_loss' in losses:
                 losses['token_loss'] = losses['token_loss'] * 0.0
             else:
-                losses['token_loss'] = pseudo_words[0, 0] * 0.0
+                losses['token_loss'] = pseudo_words[0, 0, 0] * 0.0
 
         return losses, queues_update
