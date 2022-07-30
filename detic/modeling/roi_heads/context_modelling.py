@@ -432,7 +432,7 @@ class ContextModelling(nn.Module):
             img_id_mask_0 = img_ids[:, None] == global_image_feature_img_ids[None]
             if similarity_matrix_0[:, num_queries:].shape != img_id_mask_0.shape:   # TODO: fix it
                 print(f'bug emerges: {similarity_matrix_0.shape}, {img_id_mask_0.shape}', flush=True)
-                return self.kd_jump_over_error(device=device)
+                return self.kd_jump_over_error(pseudo_words, {}, {})
             similarity_matrix_0[:, num_queries:][img_id_mask_0] = float('-inf')
         # image features as queries
         text_keys = torch.cat([clip_text_features, global_clip_text_features[..., :-1]], dim=0)
@@ -442,7 +442,7 @@ class ContextModelling(nn.Module):
             img_id_mask_1 = img_ids[:, None] == global_text_feature_img_ids[None]
             if similarity_matrix_1[:, num_queries:].shape != img_id_mask_1.shape:   # TODO: fix it
                 print(f'bug emerges: {similarity_matrix_1.shape}, {img_id_mask_1.shape}', flush=True)
-                return self.kd_jump_over_error(device=device)
+                return self.kd_jump_over_error(pseudo_words, {}, {})
             similarity_matrix_1[:, num_queries:][img_id_mask_1] = float('-inf')
 
         label = torch.arange(num_queries).to(device)
@@ -452,9 +452,9 @@ class ContextModelling(nn.Module):
         losses = dict(contrast_loss=loss * self.cfg.CONTRAST_LOSS_WEIGHT)
         # Enqueue
         queues_update = dict(clip_text_features=torch.cat([clip_text_features,
-                                                      img_ids.view(-1, 1)], dim=-1).detach(),
+                                                           img_ids.view(-1, 1)], dim=-1).detach(),
                              clip_image_features=torch.cat([clip_image_features,
-                                                      img_ids.view(-1, 1)], dim=-1).detach()
+                                                            img_ids.view(-1, 1)], dim=-1).detach()
                              )
 
         if self.checkboard_cfg.LOCAL_CORRESPONDENCE:
@@ -508,7 +508,7 @@ class ContextModelling(nn.Module):
                 img_id_mask_0 = img_ids[:, None] == global_patch_feature_img_ids[None]
                 if similarity_matrix_0[:, num_queries:].shape != img_id_mask_0.shape:  # TODO: fix it
                     print(f'bug emerges: {similarity_matrix_0.shape}, {img_id_mask_0.shape}', flush=True)
-                    return self.kd_jump_over_error(device=device)
+                    return self.kd_jump_over_error(pseudo_words, losses, queues_update)
                 similarity_matrix_0[:, num_queries:][img_id_mask_0] = float('-inf')
             # image features as queries
             text_keys = torch.cat([clip_word_features, global_clip_word_features[..., :-1]])
@@ -517,7 +517,7 @@ class ContextModelling(nn.Module):
                 img_id_mask_1 = img_ids[:, None] == global_word_feature_img_ids[None]
                 if similarity_matrix_1[:, num_queries:].shape != img_id_mask_1.shape:  # TODO: fix it
                     print(f'bug emerges: {similarity_matrix_1.shape}, {img_id_mask_1.shape}', flush=True)
-                    return self.kd_jump_over_error(device=device)
+                    return self.kd_jump_over_error(pseudo_words, losses, queues_update)
                 similarity_matrix_1[:, num_queries:][img_id_mask_1] = float('-inf')
             labels = torch.arange(num_queries, device=device)
             label_mask = box_ids[None] == box_ids[:, None]
@@ -673,13 +673,23 @@ class ContextModelling(nn.Module):
 
         return losses
 
-    def kd_jump_over_error(self, device):
-        queues_update = dict(clip_text_features=-torch.ones(1, 513).to(device),
-                             clip_image_features=-torch.ones(1, 513).to(device))
-        losses = dict(contrast_loss=torch.zeros(1).sum().to(device))
+    def kd_jump_over_error(self, pseudo_words, losses, queues_update):
+        device = pseudo_words.device
+        for k in ['clip_text_features', 'clip_image_features']:
+            if k not in queues_update:
+                queues_update[k] = -torch.ones(1, 513).to(device)
+        if 'contrast_loss' in losses:
+            losses['contrast_loss'] = losses['contrast_loss'] * 0.0
+        else:
+            losses['contrast_loss'] = pseudo_words[0, 0] * 0.0
+
         if self.checkboard_cfg.LOCAL_CORRESPONDENCE:
-            queues_update.update(clip_word_features=-torch.ones(1, 513).to(device),
-                                 clip_patch_features=-torch.ones(1, 513).to(device))
-            losses.update(token_loss=torch.zeros(1).sum().to(device))
+            for k in ['clip_word_features', 'clip_patch_features']:
+                if k not in queues_update:
+                    queues_update[k] = -torch.ones(1, 513).to(device)
+            if 'token_loss' in losses:
+                losses['token_loss'] = losses['token_loss'] * 0.0
+            else:
+                losses['token_loss'] = pseudo_words[0, 0] * 0.0
 
         return losses, queues_update
