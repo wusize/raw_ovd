@@ -60,3 +60,7 @@ _darcs
 /projects/*/datasets
 /models
 /snippet
+
+detic/modeling/roi_heads/__pycache__
+third_party/Deformable-DETR/util/__pycache__
+third_party
