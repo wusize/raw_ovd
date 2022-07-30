@@ -279,6 +279,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             scores = [(s * ps[:, None]) ** 0.5
                       for s, ps in zip(scores, proposal_scores)]
         image_shapes = [x.image_size for x in proposals]
+        import pdb; pdb.set_trace()
         return fast_rcnn_inference(
             boxes,
             scores,
