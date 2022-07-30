@@ -6,6 +6,7 @@ import numpy as np
 import math
 import random
 from torch.cuda.amp import autocast
+import torch.nn.functional as F
 
 
 # TODO: support caption
@@ -17,6 +18,7 @@ class UCLContextModelling(ContextModelling):
         if class_embeddings != '':
             class_embeddings = torch.tensor(
                 np.load(class_embeddings), dtype=torch.float32)
+            class_embeddings = F.normalize(class_embeddings, dim=-1)
             self.register_buffer('class_embeddings', class_embeddings, persistent=False)
             assert self.num_classes == class_embeddings.shape[0]
 
@@ -120,24 +122,29 @@ class UCLContextModelling(ContextModelling):
         label_matrix_0 = (contrast_clip_text_image_ids[:, None] == contrast_clip_caption_image_ids[None]).float()
 
         if image_label_info is not None:
-            contrast_clip_caption_features = torch.cat([contrast_clip_caption_features,
-                                                        self.class_embeddings], dim=0)
-            image_class_features = image_label_info['image_class_features']
-            contrast_clip_text_features = torch.cat([contrast_clip_text_features,
-                                                     image_class_features], dim=0)
             image_labels = image_label_info['image_labels']
-            num_images = len(image_class_features)
-            assert num_images == len(image_labels)
+            num_images = len(image_labels)
 
             extra_label_matrix = label_matrix_0.new_zeros(num_images, self.num_classes)
             for i in range(num_images):
                 extra_label_matrix[i, image_labels[i]] = 1.0
+            # del classes that are not samples
+            valid_classes = extra_label_matrix.sum(0) > 0.0
+            num_valid_classes = valid_classes.sum()
+            extra_label_matrix = extra_label_matrix[:, valid_classes]
 
             label_template = label_matrix_0.new_zeros(label_matrix_0.shape[0] + num_images,
-                                                      label_matrix_0.shape[1] + self.num_classes)
-            label_template[:-num_images, :-self.num_classes] = label_matrix_0
-            label_template[-num_images:, -self.num_classes:] = extra_label_matrix
+                                                      label_matrix_0.shape[1] + num_valid_classes)
+            label_template[:-num_images, :-num_valid_classes] = label_matrix_0
+            label_template[-num_images:, -num_valid_classes:] = extra_label_matrix
             label_matrix_0 = label_template
+
+            contrast_clip_caption_features = torch.cat([contrast_clip_caption_features,
+                                                        self.class_embeddings[valid_classes]], dim=0)
+            image_class_features = image_label_info['image_class_features']
+            contrast_clip_text_features = torch.cat([contrast_clip_text_features,
+                                                     image_class_features], dim=0)
+            assert num_images == len(image_class_features)
 
         # matrix 1
         label_matrix_1 = label_matrix_0.T
