@@ -201,3 +201,5 @@ def add_detic_config(cfg):
                                         'clip_caption_features']
     _C.MODEL.SAVE_PROPOSALS = False
     _C.SAVE_DEBUG_PATH = 'output/save_debug/'
+
+    _C.MODEL.RPN.POS_WEIGHT = 1.0
