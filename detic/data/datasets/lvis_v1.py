@@ -92,6 +92,7 @@ def custom_load_lvis_json(json_file, image_root, dataset_name=None):
         image_id = record["image_id"] = img_dict["id"]
 
         objs = []
+        import pdb; pdb.set_trace()
         for anno in anno_dict_list:
             assert anno["image_id"] == image_id
             if anno.get('iscrowd', 0) > 0:
