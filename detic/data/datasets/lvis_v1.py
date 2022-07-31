@@ -112,6 +112,11 @@ def custom_load_lvis_json(json_file, image_root, dataset_name=None):
                 obj["segmentation"] = segm
             objs.append(obj)
         record["annotations"] = objs
+        if len(objs) == 0:
+            ann_type = 'only_caption'
+        else:
+            ann_type = 'with_instance'
+        record['ann_type'] = ann_type
         dataset_dicts.append(record)
 
     return dataset_dicts
