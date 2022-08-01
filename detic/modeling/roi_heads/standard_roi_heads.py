@@ -344,4 +344,4 @@ class FPNMaxROIPooler(ROIPooler):
                            mode="bilinear") for x_ in x], dim=0)
         resized_x = resized_x.max(0).values
 
-        return self.level_poolers[0](resized_x, pooler_fmt_boxes)
+        return self.level_poolers[1](resized_x, pooler_fmt_boxes)     # sample at level1  1/8
