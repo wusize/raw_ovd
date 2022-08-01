@@ -10,7 +10,8 @@ from detectron2.utils.events import get_event_storage
 from detectron2.modeling.proposal_generator.proposal_utils \
     import add_ground_truth_to_proposals
 from detectron2.structures import pairwise_iou
-from detic.modeling.roi_heads.context_modelling import ContextModelling
+from detic.modeling.roi_heads.ucl_context_modelling \
+    import UCLContextModelling as ContextModelling
 from time import time
 
 
