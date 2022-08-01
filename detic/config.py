@@ -204,3 +204,5 @@ def add_detic_config(cfg):
 
     _C.CONTEXT_MODELLING.NUM_CLASSES = 80     # FOR UCL
     _C.CONTEXT_MODELLING.CLASS_EMBEDDINGS = 'datasets/metadata/coco_clip_a+cname.npy'
+
+    _C.MODEL.RPN.POS_WEIGHT = 1.0
