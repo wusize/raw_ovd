@@ -338,8 +338,8 @@ class FPNMaxROIPooler(ROIPooler):
         if num_level_assignments == 1:
             return self.level_poolers[0](x[0], pooler_fmt_boxes)
 
-        target_shape = x[0].shape[2:]
-        resized_x = torch.stack(             # resize to level0 (max)
+        target_shape = x[1].shape[2:]   # resize to level1  1/8
+        resized_x = torch.stack(
             [F.interpolate(x_, size=target_shape,
                            mode="bilinear") for x_ in x], dim=0)
         resized_x = resized_x.max(0).values
