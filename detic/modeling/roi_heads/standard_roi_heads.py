@@ -11,8 +11,15 @@ from detectron2.utils.events import get_event_storage
 from detectron2.modeling.proposal_generator.proposal_utils \
     import add_ground_truth_to_proposals
 from detectron2.structures import pairwise_iou
+from detectron2.layers import ShapeSpec
+from detectron2.modeling.roi_heads.fast_rcnn import FastRCNNOutputLayers
+from detectron2.modeling.roi_heads.box_head import build_box_head
+from detectron2.modeling.roi_heads.mask_head import build_mask_head
+from detectron2.modeling.poolers import ROIPooler
+from typing import List
 from detic.modeling.roi_heads.context_modelling import ContextModelling
 from time import time
+from detectron2.modeling.poolers import convert_boxes_to_pooler_format
 
 
 @ROI_HEADS_REGISTRY.register()
@@ -213,3 +220,131 @@ class CustomStandardROIHeads(StandardROIHeads):
             loss = loss * 0.0
 
         return loss * self.cfg.MODEL.ROI_BOX_HEAD.IMAGE_LOSS_WEIGHT
+
+
+@ROI_HEADS_REGISTRY.register()
+class MaxFPNStandardROIHeads(CustomStandardROIHeads):
+    @classmethod
+    def _init_box_head(cls, cfg, input_shape):
+        # fmt: off
+        in_features       = cfg.MODEL.ROI_HEADS.IN_FEATURES
+        pooler_resolution = cfg.MODEL.ROI_BOX_HEAD.POOLER_RESOLUTION
+        pooler_scales     = tuple(1.0 / input_shape[k].stride for k in in_features)
+        sampling_ratio    = cfg.MODEL.ROI_BOX_HEAD.POOLER_SAMPLING_RATIO
+        pooler_type       = cfg.MODEL.ROI_BOX_HEAD.POOLER_TYPE
+        # fmt: on
+
+        # If StandardROIHeads is applied on multiple feature maps (as in FPN),
+        # then we share the same predictors and therefore the channel counts must be the same
+        in_channels = [input_shape[f].channels for f in in_features]
+        # Check all channel counts are equal
+        assert len(set(in_channels)) == 1, in_channels
+        in_channels = in_channels[0]
+
+        box_pooler = FPNMaxROIPooler(
+            output_size=pooler_resolution,
+            scales=pooler_scales,
+            sampling_ratio=sampling_ratio,
+            pooler_type=pooler_type,
+        )
+        # Here we split "box head" and "box predictor", which is mainly due to historical reasons.
+        # They are used together so the "box predictor" layers should be part of the "box head".
+        # New subclasses of ROIHeads do not need "box predictor"s.
+        box_head = build_box_head(
+            cfg, ShapeSpec(channels=in_channels, height=pooler_resolution, width=pooler_resolution)
+        )
+        box_predictor = FastRCNNOutputLayers(cfg, box_head.output_shape)
+        return {
+            "box_in_features": in_features,
+            "box_pooler": box_pooler,
+            "box_head": box_head,
+            "box_predictor": box_predictor,
+        }
+
+    @classmethod
+    def _init_mask_head(cls, cfg, input_shape):
+        if not cfg.MODEL.MASK_ON:
+            return {}
+        # fmt: off
+        in_features       = cfg.MODEL.ROI_HEADS.IN_FEATURES
+        pooler_resolution = cfg.MODEL.ROI_MASK_HEAD.POOLER_RESOLUTION
+        pooler_scales     = tuple(1.0 / input_shape[k].stride for k in in_features)
+        sampling_ratio    = cfg.MODEL.ROI_MASK_HEAD.POOLER_SAMPLING_RATIO
+        pooler_type       = cfg.MODEL.ROI_MASK_HEAD.POOLER_TYPE
+        # fmt: on
+
+        in_channels = [input_shape[f].channels for f in in_features][0]
+
+        ret = {"mask_in_features": in_features}
+        ret["mask_pooler"] = (
+            FPNMaxROIPooler(
+                output_size=pooler_resolution,
+                scales=pooler_scales,
+                sampling_ratio=sampling_ratio,
+                pooler_type=pooler_type,
+            )
+            if pooler_type
+            else None
+        )
+        if pooler_type:
+            shape = ShapeSpec(
+                channels=in_channels, width=pooler_resolution, height=pooler_resolution
+            )
+        else:
+            shape = {f: input_shape[f] for f in in_features}
+        ret["mask_head"] = build_mask_head(cfg, shape)
+        return ret
+
+
+class FPNMaxROIPooler(ROIPooler):
+    def forward(self, x: List[torch.Tensor], box_lists: List[Boxes]):
+        """
+        Args:
+            x (list[Tensor]): A list of feature maps of NCHW shape, with scales matching those
+                used to construct this module.
+            box_lists (list[Boxes] | list[RotatedBoxes]):
+                A list of N Boxes or N RotatedBoxes, where N is the number of images in the batch.
+                The box coordinates are defined on the original image and
+                will be scaled by the `scales` argument of :class:`ROIPooler`.
+
+        Returns:
+            Tensor:
+                A tensor of shape (M, C, output_size, output_size) where M is the total number of
+                boxes aggregated over all N batch images and C is the number of channels in `x`.
+        """
+        num_level_assignments = len(self.level_poolers)
+
+        assert isinstance(x, list) and isinstance(
+            box_lists, list
+        ), "Arguments to pooler must be lists"
+        assert (
+            len(x) == num_level_assignments
+        ), "unequal value, num_level_assignments={}, but x is list of {} Tensors".format(
+            num_level_assignments, len(x)
+        )
+
+        assert len(box_lists) == x[0].size(
+            0
+        ), "unequal value, x[0] batch dim 0 is {}, but box_list has length {}".format(
+            x[0].size(0), len(box_lists)
+        )
+        if len(box_lists) == 0:
+            return torch.zeros(
+                (0, x[0].shape[1]) + self.output_size, device=x[0].device, dtype=x[0].dtype
+            )
+
+        pooler_fmt_boxes = convert_boxes_to_pooler_format(box_lists)
+
+        if num_level_assignments == 1:
+            return self.level_poolers[0](x[0], pooler_fmt_boxes)
+
+        pooled_output_list = []
+
+        for level, pooler in enumerate(self.level_poolers):
+            # pool on all levels
+            pooled_output_list.append(pooler(x[level], pooler_fmt_boxes))
+
+        pooled_output = torch.stack(pooled_output_list, dim=0)
+        pooled_output = pooled_output.max(0).values
+
+        return pooled_output
