@@ -304,16 +304,17 @@ class MaxFPNStandardROIHeads(CustomStandardROIHeads):
 class FPNMaxROIPooler(ROIPooler):
     def __init__(self, num_channels, conv_norm, *args, **kwargs):
         super(FPNMaxROIPooler, self).__init__(*args, **kwargs)
-        self.conv = Conv2d(
-            num_channels,
-            num_channels,
-            kernel_size=3,
-            stride=1,
-            padding=1,
-            bias=not conv_norm,
-            norm=get_norm(conv_norm, num_channels),
-            activation=nn.LeakyReLU(),
-        )
+        # self.conv = Conv2d(
+        #     num_channels,
+        #     num_channels,
+        #     kernel_size=3,
+        #     stride=1,
+        #     padding=1,
+        #     bias=not conv_norm,
+        #     norm=get_norm(conv_norm, num_channels),
+        #     activation=nn.LeakyReLU(),
+        # )
+        self.conv = nn.Identity()
 
     def forward(self, x: List[torch.Tensor], box_lists: List[Boxes]):
         """
