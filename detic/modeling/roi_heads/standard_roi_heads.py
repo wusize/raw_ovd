@@ -360,7 +360,8 @@ class FPNMaxROIPooler(ROIPooler):
         batch_size, num_channels, h, w = x[1].shape
         resized_x = torch.cat(
             [F.interpolate(x_, size=[h, w],
-                           mode="bilinear") for x_ in x], dim=0)
+                           mode="bilinear",
+                           align_corners=False) for x_ in x], dim=0)
         resized_x = self.conv(resized_x).view(num_level_assignments,
                                               batch_size, num_channels, h, w)
         resized_x = resized_x.max(0).values
