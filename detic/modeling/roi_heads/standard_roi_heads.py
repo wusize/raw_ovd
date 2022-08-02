@@ -2,6 +2,7 @@
 from detectron2.structures.instances import Instances
 from detectron2.structures.boxes import Boxes
 import torch
+import torch.nn as nn
 import numpy as np
 from detectron2.config import configurable
 from detectron2.modeling.roi_heads.roi_heads import ROI_HEADS_REGISTRY, StandardROIHeads
@@ -20,7 +21,7 @@ from typing import List
 from detic.modeling.roi_heads.context_modelling import ContextModelling
 from time import time
 from detectron2.modeling.poolers import convert_boxes_to_pooler_format
-
+from detectron2.layers import Conv2d, get_norm
 
 @ROI_HEADS_REGISTRY.register()
 class CustomStandardROIHeads(StandardROIHeads):
@@ -242,6 +243,8 @@ class MaxFPNStandardROIHeads(CustomStandardROIHeads):
         in_channels = in_channels[0]
 
         box_pooler = FPNMaxROIPooler(
+            num_channels=in_channels,
+            conv_norm=cfg.MODEL.ROI_BOX_HEAD.NORM,
             output_size=pooler_resolution,
             scales=pooler_scales,
             sampling_ratio=sampling_ratio,
@@ -278,6 +281,8 @@ class MaxFPNStandardROIHeads(CustomStandardROIHeads):
         ret = {"mask_in_features": in_features}
         ret["mask_pooler"] = (
             FPNMaxROIPooler(
+                num_channels=in_channels,
+                conv_norm=cfg.MODEL.ROI_MASK_HEAD.NORM,
                 output_size=pooler_resolution,
                 scales=pooler_scales,
                 sampling_ratio=sampling_ratio,
@@ -297,6 +302,19 @@ class MaxFPNStandardROIHeads(CustomStandardROIHeads):
 
 
 class FPNMaxROIPooler(ROIPooler):
+    def __init__(self, num_channels, conv_norm, *args, **kwargs):
+        super(FPNMaxROIPooler, self).__init__(*args, **kwargs)
+        self.conv = Conv2d(
+            num_channels,
+            num_channels,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=not conv_norm,
+            norm=get_norm(conv_norm, num_channels),
+            activation=nn.LeakyReLU(),
+        )
+
     def forward(self, x: List[torch.Tensor], box_lists: List[Boxes]):
         """
         Args:
@@ -338,10 +356,13 @@ class FPNMaxROIPooler(ROIPooler):
         if num_level_assignments == 1:
             return self.level_poolers[0](x[0], pooler_fmt_boxes)
 
-        target_shape = x[1].shape[2:]   # resize to level1  1/8
-        resized_x = torch.stack(
-            [F.interpolate(x_, size=target_shape,
+        # target_shape = x[1].shape[2:]   # resize to level1  1/8
+        batch_size, num_channels, h, w = x[1].shape
+        resized_x = torch.cat(
+            [F.interpolate(x_, size=[h, w],
                            mode="bilinear") for x_ in x], dim=0)
+        resized_x = self.conv(resized_x).view(num_level_assignments,
+                                              batch_size, num_channels, h, w)
         resized_x = resized_x.max(0).values
 
         return self.level_poolers[1](resized_x, pooler_fmt_boxes)     # sample at level1  1/8
