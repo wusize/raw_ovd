@@ -6,6 +6,7 @@ from .modeling.roi_heads.standard_roi_heads import MaxFPNStandardROIHeads
 from .modeling.backbone import swintransformer
 from .modeling.backbone import timm
 from .modeling.rpn.custom_rpn import CustomRPN
+from .modeling.fpn.pa_fpn import build_resnet_pafpn_backbone
 
 
 from .data.datasets import lvis_v1
