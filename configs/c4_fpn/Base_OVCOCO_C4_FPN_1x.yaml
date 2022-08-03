@@ -1,0 +1,61 @@
+MODEL:
+  PROPOSAL_GENERATOR:
+    NAME: "CustomRPN"
+  META_ARCHITECTURE: "CustomRCNN"
+  BACKBONE:
+    NAME: "build_resnet_c4fpn_backbone"
+  RESNETS:
+    DEPTH: 50
+    OUT_FEATURES: [ "res2", "res3", "res4", "res5" ]
+  FPN:
+    IN_FEATURES: [ "res2", "res3", "res4", "res5" ]
+  ANCHOR_GENERATOR:
+    SIZES: [ [ 32 ], [ 64 ], [ 128 ], [ 256 ], [ 512 ] ]  # One size for each in feature map
+    ASPECT_RATIOS: [ [ 0.5, 1.0, 2.0 ] ]  # Three aspect ratios (same for all in feature maps)
+  RPN:
+    IN_FEATURES: [ "p2", "p3", "p4", "p5", "p6" ]
+    PRE_NMS_TOPK_TRAIN: 2000  # Per FPN level
+    PRE_NMS_TOPK_TEST: 1000  # Per FPN level
+    POST_NMS_TOPK_TRAIN: 1000
+    POST_NMS_TOPK_TEST: 1000
+  ROI_HEADS:
+    NAME: "CustomStandardROIHeads"
+    IN_FEATURES: [ "p2", "p3", "p4", "p5" ]
+  WEIGHTS: "models/R-50.pkl"
+  ROI_BOX_HEAD:
+    RANDOM_DROPOUT: 0.5
+    NORM_TEMP: 25.0
+    USE_BIAS: -20.0
+    NAME: "FastRCNNConvFCHead"
+    NUM_FC: 2
+    POOLER_RESOLUTION: 7
+    CLS_AGNOSTIC_BBOX_REG: True
+    USE_SIGMOID_CE: True
+    USE_ZEROSHOT_CLS: True
+    ZEROSHOT_WEIGHT_PATH: 'datasets/metadata/coco_clip_attn12.npy'
+    IGNORE_ZERO_CATS: True
+    CAT_FREQ_PATH: 'datasets/coco/zero-shot/instances_train2017_seen_2_oriorder_cat_info.json'
+    NUM_WORDS: 4
+    WORD_EMBED_DIM: 512
+    CLS_LOSS_WEIGHT: 1.0
+  CLIP:
+    NAME: 'ViT-B/32'
+    USE_IMAGE_ENCODER: False
+    MODEL_ROOT: 'models'
+
+DATASETS:
+  TRAIN: ("coco_zeroshot_train_oriorder",)
+  TEST: ("coco_generalized_zeroshot_val",)
+SOLVER:
+  IMS_PER_BATCH: 16
+  BASE_LR: 0.02
+  STEPS: (60000, 80000)
+  MAX_ITER: 90000
+  CHECKPOINT_PERIOD: 30000
+INPUT:
+  MIN_SIZE_TRAIN: (800,)
+VERSION: 2
+OUTPUT_DIR: output/Detic-COCO/auto
+FP16: True
+DATALOADER:
+  FILTER_EMPTY_ANNOTATIONS: True

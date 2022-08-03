@@ -7,7 +7,8 @@ from .modeling.backbone import swintransformer
 from .modeling.backbone import timm
 from .modeling.rpn.custom_rpn import CustomRPN
 from .modeling.fpn.pa_fpn import build_resnet_pafpn_backbone
-
+from .modeling.fpn.c4_fpn import build_resnet_c4fpn_backbone
+from .modeling.fpn.fpn2c4 import build_resnet_fpn2c4_backbone
 
 from .data.datasets import lvis_v1
 from .data.datasets import imagenet
