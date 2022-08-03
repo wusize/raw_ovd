@@ -1,14 +1,29 @@
 from detectron2.modeling.backbone.fpn import FPN, LastLevelMaxPool
 import torch.nn.functional as F
-from detectron2.layers import ShapeSpec
+from detectron2.layers import ShapeSpec, get_norm, Conv2d
 from detectron2.modeling.backbone.build import BACKBONE_REGISTRY
 from detectron2.modeling.backbone.resnet import build_resnet_backbone
 import torch
-
+import torch.nn as nn
+import fvcore.nn.weight_init as weight_init
 __all__ = ["build_resnet_c4fpn_backbone", "C4FPN"]
 
 
 class C4FPN(FPN):
+    def __init__(self, bottom_up, in_features, out_channels, norm="", top_block=None, fuse_type="sum"):
+        super(C4FPN, self).__init__(bottom_up, in_features, out_channels, norm, top_block, fuse_type)
+        use_bias = norm == ""
+        merge_conv = []
+        for channels in self._out_feature_channels.values():
+            output_norm = get_norm(norm, channels)
+            conv = Conv2d(
+                1024 + channels, channels,
+                kernel_size=3, stride=1, padding=1,
+                bias=use_bias, norm=output_norm)
+            weight_init.c2_xavier_fill(conv)
+            merge_conv.append(conv)
+        self.merge_convs = nn.ModuleList(merge_conv)
+
     def forward(self, x):
         """
         Args:
@@ -52,21 +67,15 @@ class C4FPN(FPN):
             results.extend(self.top_block(top_block_in_feature))
         assert len(self._out_features) == len(results)
 
-        outs = {f: torch.cat([res, F.interpolate(c4_feature,
-                                                 size=res.shape[2:],
-                                                 align_corners=False,
-                                                 mode='bilinear')], dim=1)
-                for f, res in zip(self._out_features, results)}
+        outs = {f: merge_conv(torch.cat([res,
+                                         F.interpolate(c4_feature,
+                                                       size=res.shape[2:],
+                                                       align_corners=False,
+                                                       mode='bilinear')],
+                                        dim=1))
+                for f, res, merge_conv in zip(self._out_features,
+                                              results, self.merge_convs)}
         return outs
-
-    def output_shape(self):
-        return {
-            name: ShapeSpec(
-                channels=self._out_feature_channels[name] + 1024,
-                stride=self._out_feature_strides[name]
-            )
-            for name in self._out_features
-        }
 
 
 @BACKBONE_REGISTRY.register()
