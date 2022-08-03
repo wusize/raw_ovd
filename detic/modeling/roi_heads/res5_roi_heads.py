@@ -14,6 +14,7 @@ from detectron2.structures import pairwise_iou
 from detic.modeling.roi_heads.ucl_context_modelling \
     import UCLContextModelling as ContextModelling
 from time import time
+from torch.nn import functional as F
 
 
 @ROI_HEADS_REGISTRY.register()
@@ -81,16 +82,17 @@ class CustomRes5ROIHeads(Res5ROIHeads):
             storage.put_scalar("time/detector_forward", np.float32(tok - tik))
 
             if self.cfg.MODEL.WITH_IMAGE_LABELS:
-                image_label_info = self.image_label_info(resized_image_info)
-            else:
-                image_label_info = None
+                loss = self.image_label_loss(resized_image_info)
+                if loss is None:
+                    loss = list(losses.values())[0] * 0.0
+                losses.update(image_label_loss=loss)
 
             # TODO contrastive learning
             if self.context_modeling_cfg.ENABLE:
                 losses.update(self.context_modeling.get_loss(group_infos,
                                                              predictions, clip_images,
                                                              self.box_predictor.clip, image_info,
-                                                             image_label_info=image_label_info))
+                                                             image_label_info=None))
                 storage.put_scalar("time/contrast_learning", np.float32(time() - tok))
 
             return proposals, losses
