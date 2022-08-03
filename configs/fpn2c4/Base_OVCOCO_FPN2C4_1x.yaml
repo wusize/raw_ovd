@@ -13,12 +13,16 @@ MODEL:
     PRE_NMS_TOPK_TEST: 6000
     POST_NMS_TOPK_TEST: 1000
   ROI_HEADS:
-    NAME: "CustomRes5ROIHeads"
+    NAME: "CustomStandardROIHeads"
+    IN_FEATURES: ["res4"]
   WEIGHTS: "models/R-50.pkl"
   ROI_BOX_HEAD:
     RANDOM_DROPOUT: 0.5
     NORM_TEMP: 25.0
     USE_BIAS: -20.0
+    NAME: "FastRCNNConvFCHead"
+    NUM_FC: 2
+    POOLER_RESOLUTION: 7
     CLS_AGNOSTIC_BBOX_REG: True
     USE_SIGMOID_CE: True
     USE_ZEROSHOT_CLS: True

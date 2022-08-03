@@ -13,7 +13,7 @@ class FPN2C4(FPN):
         super(FPN2C4, self).__init__(bottom_up, in_features, out_channels, norm, top_block, fuse_type)
         use_bias = norm == ""
         output_norm = get_norm(norm, 1024)
-        self.conv = Conv2d(
+        self.merge_conv = Conv2d(
             1024 + 256 * len(self._out_features), 1024,
             kernel_size=3,
             stride=1,
@@ -72,7 +72,7 @@ class FPN2C4(FPN):
                                           mode='bilinear') for res in results],
                            dim=1)
 
-        return dict(res4=self.conv(output))
+        return dict(res4=self.merge_conv(output))
 
     def output_shape(self):
         return {'res4': ShapeSpec(channels=1024, height=None, width=None, stride=16)}
