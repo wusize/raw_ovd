@@ -4,7 +4,7 @@ from detectron2.modeling.backbone.build import BACKBONE_REGISTRY
 from detectron2.modeling.backbone.resnet import build_resnet_backbone
 import torch
 from detectron2.layers import Conv2d, ShapeSpec, get_norm
-
+import fvcore.nn.weight_init as weight_init
 __all__ = ["build_resnet_fpn2c4_backbone", "FPN2C4"]
 
 
@@ -21,6 +21,7 @@ class FPN2C4(FPN):
             bias=use_bias,
             norm=output_norm,
         )
+        weight_init.c2_xavier_fill(self.merge_conv)
 
     def forward(self, x):
         """
