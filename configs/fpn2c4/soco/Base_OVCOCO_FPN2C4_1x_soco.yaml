@@ -19,7 +19,7 @@ MODEL:
     PRE_NMS_TOPK_TEST: 6000
     POST_NMS_TOPK_TEST: 1000
   ROI_HEADS:
-    NAME: "CustomRes5ROIHeadsExtraNorm"
+    NAME: "CustomRes5ROIHeads"
   WEIGHTS: "models/res50_c4_soco_400.pkl"
   ROI_BOX_HEAD:
     RANDOM_DROPOUT: 0.5
