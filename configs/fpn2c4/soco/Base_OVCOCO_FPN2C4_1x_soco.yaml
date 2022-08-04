@@ -8,12 +8,12 @@ MODEL:
     NAME: "build_resnet_fpn2c4_backbone"
     FREEZE_AT: 0
   RESNETS:
-    NORM: "SyncBN"
+    NORM: "BN"  # "SyncBN"
     STRIDE_IN_1X1: False
     DEPTH: 50
     OUT_FEATURES: [ "res2", "res3", "res4"]
   FPN:
-    NORM: "SyncBN"
+    NORM: "BN"  # "SyncBN"
     IN_FEATURES: [ "res2", "res3", "res4"]
   RPN:
     PRE_NMS_TOPK_TEST: 6000
