@@ -201,12 +201,12 @@ class CustomRes5ROIHeads(Res5ROIHeads):
 
 @ROI_HEADS_REGISTRY.register()
 class CustomRes5ROIHeadsExtraNorm(CustomRes5ROIHeads):
-    def _build_res5_block(self, cfg):
-        seq, out_channels = super()._build_res5_block(cfg)
-        norm = cfg.MODEL.RESNETS.NORM
-        norm = get_norm(norm, out_channels)
-        seq.add_module("norm", norm)
-        return seq, out_channels
+    # def _build_res5_block(self, cfg):
+    #     seq, out_channels = super()._build_res5_block(cfg)
+    #     norm = cfg.MODEL.RESNETS.NORM
+    #     norm = get_norm(norm, out_channels)
+    #     seq.add_module("norm", norm)
+    #     return seq, out_channels
 
     def forward(self, images, features, proposals, targets=None,
                 ann_types=None, clip_images=None, image_info=None,
