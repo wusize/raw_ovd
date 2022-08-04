@@ -13,7 +13,7 @@ from detectron2.modeling.meta_arch.rcnn import GeneralizedRCNN
 from time import time
 from torch.cuda.amp import autocast
 from ..utils import load_class_freq
-from .utils import process_proposals
+from .utils import process_proposals, save_features
 import json
 import os
 
@@ -81,13 +81,20 @@ class CustomRCNN(GeneralizedRCNN):
         features = self.backbone(images.tensor)
         proposals, _ = self.proposal_generator(images, features, None)
         results, _ = self.roi_heads(images, features, proposals)
+
+        if self.cfg.MODEL.SAVE_FEATURES:
+            save_features(features, [b['file_name'] for b in batched_inputs],
+                          self.cfg.SAVE_DEBUG_PATH)
         if self.cfg.MODEL.SAVE_PROPOSALS:
+            save_dir = os.path.join(self.cfg.SAVE_DEBUG_PATH, 'proposals')
+            os.makedirs(save_dir, exist_ok=True)
             image_proposals = process_proposals(batched_inputs, images, proposals)
             for img_p in image_proposals:
                 file_name = img_p['file_name']
-                with open(os.path.join(self.cfg.SAVE_DEBUG_PATH,
+                with open(os.path.join(save_dir,
                                        file_name.split('.')[0] + '.json'), 'w') as f:
                     json.dump(img_p, f)
+
         if do_postprocess:
             assert not torch.jit.is_scripting(), \
                 "Scripting is not supported for postprocess."
