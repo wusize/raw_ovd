@@ -3,7 +3,7 @@ from detectron2.structures.instances import Instances
 import torch
 import numpy as np
 from detectron2.config import configurable
-from detectron2.layers import ShapeSpec
+from detectron2.layers import ShapeSpec, get_norm
 from detectron2.modeling.roi_heads.roi_heads import ROI_HEADS_REGISTRY, Res5ROIHeads
 from .detic_fast_rcnn import DeticFastRCNNOutputLayers
 from torch.nn import functional as F
@@ -197,3 +197,13 @@ class CustomRes5ROIHeads(Res5ROIHeads):
             loss = loss * 0.0
 
         return loss * self.cfg.MODEL.ROI_BOX_HEAD.IMAGE_LOSS_WEIGHT
+
+
+@ROI_HEADS_REGISTRY.register()
+class CustomRes5ROIHeadsExtraNorm(CustomRes5ROIHeads):
+    def _build_res5_block(self, cfg):
+        seq, out_channels = super()._build_res5_block(cfg)
+        norm = cfg.MODEL.RESNETS.NORM
+        norm = get_norm(norm, out_channels)
+        seq.add_module("norm", norm)
+        return seq, out_channels

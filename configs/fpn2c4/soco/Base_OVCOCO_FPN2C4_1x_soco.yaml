@@ -11,26 +11,20 @@ MODEL:
     NORM: "SyncBN"
     STRIDE_IN_1X1: False
     DEPTH: 50
-    OUT_FEATURES: [ "res2", "res3", "res4", "res5" ]
+    OUT_FEATURES: [ "res2", "res3", "res4"]
   FPN:
     NORM: "SyncBN"
-    IN_FEATURES: [ "res2", "res3", "res4", "res5" ]
+    IN_FEATURES: [ "res2", "res3", "res4"]
   RPN:
     PRE_NMS_TOPK_TEST: 6000
     POST_NMS_TOPK_TEST: 1000
   ROI_HEADS:
-    NAME: "CustomStandardROIHeads"
-    IN_FEATURES: ["res4"]
-  WEIGHTS: "models/res50_fpn_soco_star_400.pkl"
+    NAME: "CustomRes5ROIHeadsExtraNorm"
+  WEIGHTS: "models/res50_c4_soco_400.pkl"
   ROI_BOX_HEAD:
     RANDOM_DROPOUT: 0.5
     NORM_TEMP: 25.0
     USE_BIAS: -20.0
-    NAME: "FastRCNNConvFCHead"
-    POOLER_RESOLUTION: 7
-    NUM_CONV: 4
-    NORM: "SyncBN"
-    NUM_FC: 1
     CLS_AGNOSTIC_BBOX_REG: True
     USE_SIGMOID_CE: True
     USE_ZEROSHOT_CLS: True
