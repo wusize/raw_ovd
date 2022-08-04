@@ -25,7 +25,7 @@ MODEL:
     POST_NMS_TOPK_TRAIN: 1000
     POST_NMS_TOPK_TEST: 1000
   ROI_HEADS:
-    NAME: "CustomStandardROIHeads"
+    NAME: "C4FPNStandardROIHeads"
     IN_FEATURES: [ "p2", "p3", "p4", "p5" ]
   WEIGHTS: "models/res50_fpn_soco_star_400.pkl"
   ROI_BOX_HEAD:

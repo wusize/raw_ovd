@@ -151,7 +151,7 @@ class DeticCascadeROIHeads(CascadeROIHeads):
 
     def forward(self, images, features, proposals, targets=None,
                 ann_types=None, clip_images=None, image_info=None,
-                resized_image_info=None
+                resized_image_info=None, **kwargs
                 ):
         '''
         enable debug and image labels

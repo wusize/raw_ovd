@@ -155,13 +155,12 @@ class CustomRCNN(GeneralizedRCNN):
 
         if self.roi_head_name in ['StandardROIHeads', 'CascadeROIHeads']:
             proposals, detector_losses = self.roi_heads(
-                images, features, proposals, gt_instances, clip_images=clip_images,
-                image_info=image_info)
+                images, features, proposals, gt_instances)
         else:
             proposals, detector_losses = self.roi_heads(
                 images, features, proposals, gt_instances,
                 ann_types=ann_types, clip_images=clip_images, image_info=image_info,
-                resized_image_info=resized_image_info)
+                resized_image_info=resized_image_info, backbone=self.backbone)
         tok = time()
         storage.put_scalar("time/roi_heads", tok - tik)
         

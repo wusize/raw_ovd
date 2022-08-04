@@ -2,7 +2,7 @@
 from .modeling.meta_arch import custom_rcnn
 from .modeling.roi_heads import detic_roi_heads
 from .modeling.roi_heads import res5_roi_heads, standard_roi_heads
-from .modeling.roi_heads.standard_roi_heads import MaxFPNStandardROIHeads
+from .modeling.roi_heads.c4_fpn_roi_heads import C4FPNStandardROIHeads
 from .modeling.backbone import swintransformer
 from .modeling.backbone import timm
 from .modeling.rpn.custom_rpn import CustomRPN

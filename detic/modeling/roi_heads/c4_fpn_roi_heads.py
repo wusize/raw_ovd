@@ -13,14 +13,16 @@ from detectron2.modeling.proposal_generator.proposal_utils \
 from detectron2.structures import pairwise_iou
 from detic.modeling.roi_heads.context_modelling import ContextModelling
 from time import time
+from detectron2.modeling.poolers import ROIPooler
+import torch.nn as nn
 
 
 @ROI_HEADS_REGISTRY.register()
-class CustomStandardROIHeads(StandardROIHeads):
+class C4FPNStandardROIHeads(StandardROIHeads):
     @configurable
     def __init__(self, **kwargs):
         cfg = kwargs.pop('cfg')
-        super(CustomStandardROIHeads, self).__init__(**kwargs)
+        super(C4FPNStandardROIHeads, self).__init__(**kwargs)
         self.ws_num_props = cfg.MODEL.ROI_BOX_HEAD.WS_NUM_PROPS
         self.image_box_size = cfg.MODEL.ROI_BOX_HEAD.IMAGE_BOX_SIZE
         self.box_predictor = DeticFastRCNNOutputLayers(
@@ -35,57 +37,23 @@ class CustomStandardROIHeads(StandardROIHeads):
                                                  word_embed_dim=self.box_predictor.word_embed_dim,
                                                  word_dropout=self.box_predictor.word_dropout)
 
+        pooler_resolution = cfg.MODEL.ROI_BOX_HEAD.POOLER_RESOLUTION
+        pooler_type = cfg.MODEL.ROI_BOX_HEAD.POOLER_TYPE
+        sampling_ratio = cfg.MODEL.ROI_BOX_HEAD.POOLER_SAMPLING_RATIO
+        standard_channels = self.box_head.output_shape.channels
+        self.c4_pooler = ROIPooler(
+            output_size=pooler_resolution * 2,  # will be reduced by res5
+            scales=[1 / 16],
+            sampling_ratio=sampling_ratio,
+            pooler_type=pooler_type,
+        )
+        self.merge_fc = nn.Linear(2048 + standard_channels, standard_channels)
+
     @classmethod
     def from_config(cls, cfg, input_shape):
         ret = super().from_config(cfg, input_shape)
         ret['cfg'] = cfg
         return ret
-
-    def _forward_box(self, features, proposals,
-                     clip_images=None, image_info=None,
-                     resized_image_info=None, group_infos=None, **kwargs):
-        features = [features[f] for f in self.box_in_features]
-        box_features = self.box_pooler(features, [x.proposal_boxes for x in proposals])
-        box_features = self.box_head(box_features)
-
-        if self.training:
-            losses = dict()
-            storage = get_event_storage()
-            tik = time()
-            predictions = self._box_forward_train(box_features, proposals)
-            losses.update(self.box_predictor.losses(predictions,
-                                                    [p[p.sample_types == 0] for p in proposals]))
-            tok = time()
-            # print('detector loss:', tok - tik)
-            storage.put_scalar("time/detector_forward", np.float32(tok - tik))
-
-            # TODO contrastive learning
-            if self.context_modeling_cfg.ENABLE:
-                losses.update(self.context_modeling.get_loss(group_infos,
-                                                             predictions, clip_images,
-                                                             self.box_predictor.clip, image_info))
-                storage.put_scalar("time/contrast_learning", np.float32(time() - tok))
-
-            if self.cfg.MODEL.WITH_IMAGE_LABELS:
-                loss = self.image_label_loss(resized_image_info)
-                if loss is None:
-                    loss = list(losses.values())[0] * 0.0
-                losses.update(image_label_loss=loss)
-
-            if self.train_on_pred_boxes:
-                with torch.no_grad():
-                    pred_boxes = self.box_predictor.predict_boxes_for_gt_classes(
-                        predictions, proposals
-                    )
-                    for proposals_per_image, pred_boxes_per_image in zip(proposals, pred_boxes):
-                        proposals_per_image.proposal_boxes = Boxes(pred_boxes_per_image)
-
-            return losses
-        else:
-            predictions = self.box_predictor(box_features)
-            del box_features
-            pred_instances, _ = self.box_predictor.inference(predictions, proposals)
-            return pred_instances
 
     def forward(self, images, features, proposals, targets=None,
                 ann_types=None, clip_images=None, image_info=None,
@@ -212,3 +180,60 @@ class CustomStandardROIHeads(StandardROIHeads):
             loss = loss * 0.0
 
         return loss * self.cfg.MODEL.ROI_BOX_HEAD.IMAGE_LOSS_WEIGHT
+
+    def _add_c4_box_feature(self, box_features, c4_feature, boxes_list, backbone):
+        c4_feature = self.c4_pooler([c4_feature], boxes_list)
+        c4_feature = backbone.bottom_up.res5(c4_feature)
+        c4_feature = c4_feature.mean(dim=[2, 3])
+
+        return self.merge_fc(torch.cat([box_features, c4_feature], dim=-1))
+
+    def _forward_box(self, features, proposals,
+                     clip_images=None, image_info=None,
+                     resized_image_info=None, group_infos=None, backbone=None):
+        c4_feature = features['res4']
+        features = [features[f] for f in self.box_in_features]
+        box_features = self.box_pooler(features, [x.proposal_boxes for x in proposals])
+        box_features = self.box_head(box_features)
+
+        box_features = self._add_c4_box_feature(box_features, c4_feature,
+                                                [x.proposal_boxes for x in proposals],
+                                                backbone)
+        if self.training:
+            losses = dict()
+            storage = get_event_storage()
+            tik = time()
+            predictions = self._box_forward_train(box_features, proposals)
+            losses.update(self.box_predictor.losses(predictions,
+                                                    [p[p.sample_types == 0] for p in proposals]))
+            tok = time()
+            # print('detector loss:', tok - tik)
+            storage.put_scalar("time/detector_forward", np.float32(tok - tik))
+
+            # TODO contrastive learning
+            if self.context_modeling_cfg.ENABLE:
+                losses.update(self.context_modeling.get_loss(group_infos,
+                                                             predictions, clip_images,
+                                                             self.box_predictor.clip, image_info))
+                storage.put_scalar("time/contrast_learning", np.float32(time() - tok))
+
+            if self.cfg.MODEL.WITH_IMAGE_LABELS:
+                loss = self.image_label_loss(resized_image_info)
+                if loss is None:
+                    loss = list(losses.values())[0] * 0.0
+                losses.update(image_label_loss=loss)
+
+            if self.train_on_pred_boxes:
+                with torch.no_grad():
+                    pred_boxes = self.box_predictor.predict_boxes_for_gt_classes(
+                        predictions, proposals
+                    )
+                    for proposals_per_image, pred_boxes_per_image in zip(proposals, pred_boxes):
+                        proposals_per_image.proposal_boxes = Boxes(pred_boxes_per_image)
+
+            return losses
+        else:
+            predictions = self.box_predictor(box_features)
+            del box_features
+            pred_instances, _ = self.box_predictor.inference(predictions, proposals)
+            return pred_instances
