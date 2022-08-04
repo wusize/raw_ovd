@@ -1,4 +1,5 @@
-from detectron2.modeling.backbone.fpn import FPN, LastLevelMaxPool
+from detectron2.modeling.backbone.fpn import FPN
+import torch.nn as nn
 import torch.nn.functional as F
 from detectron2.modeling.backbone.build import BACKBONE_REGISTRY
 from detectron2.modeling.backbone.resnet import build_resnet_backbone
@@ -101,3 +102,18 @@ def build_resnet_fpn2c4_backbone(cfg, input_shape: ShapeSpec):
         fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
     )
     return backbone
+
+
+class LastLevelMaxPool(nn.Module):
+    """
+    This module is used in the original FPN to generate a downsampled
+    P6 feature from P5.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.num_levels = 1
+        self.in_feature = "p4"
+
+    def forward(self, x):
+        return [F.max_pool2d(x, kernel_size=1, stride=2, padding=0)]

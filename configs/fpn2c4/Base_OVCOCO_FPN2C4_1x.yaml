@@ -6,23 +6,19 @@ MODEL:
     NAME: "build_resnet_fpn2c4_backbone"
   RESNETS:
     DEPTH: 50
-    OUT_FEATURES: [ "res2", "res3", "res4", "res5" ]
+    OUT_FEATURES: [ "res2", "res3", "res4" ]
   FPN:
-    IN_FEATURES: [ "res2", "res3", "res4", "res5" ]
+    IN_FEATURES: [ "res2", "res3", "res4"]
   RPN:
     PRE_NMS_TOPK_TEST: 6000
     POST_NMS_TOPK_TEST: 1000
   ROI_HEADS:
-    NAME: "CustomStandardROIHeads"
-    IN_FEATURES: ["res4"]
+    NAME: "CustomRes5ROIHeads"
   WEIGHTS: "models/R-50.pkl"
   ROI_BOX_HEAD:
     RANDOM_DROPOUT: 0.5
     NORM_TEMP: 25.0
     USE_BIAS: -20.0
-    NAME: "FastRCNNConvFCHead"
-    NUM_FC: 2
-    POOLER_RESOLUTION: 7
     CLS_AGNOSTIC_BBOX_REG: True
     USE_SIGMOID_CE: True
     USE_ZEROSHOT_CLS: True
