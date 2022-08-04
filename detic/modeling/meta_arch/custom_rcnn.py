@@ -80,7 +80,7 @@ class CustomRCNN(GeneralizedRCNN):
         images = self.preprocess_image(batched_inputs)
         features = self.backbone(images.tensor)
         proposals, _ = self.proposal_generator(images, features, None)
-        results, _ = self.roi_heads(images, features, proposals)
+        results, _ = self.roi_heads(images, features, proposals, backbone=self.backbone)
 
         if self.cfg.MODEL.SAVE_FEATURES:
             save_features(features, [b['file_name'] for b in batched_inputs],
