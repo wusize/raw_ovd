@@ -4,7 +4,7 @@ import torch
 import numpy as np
 from detectron2.config import configurable
 from detectron2.layers import ShapeSpec, get_norm
-from detectron2.modeling.roi_heads.roi_heads import ROI_HEADS_REGISTRY, Res5ROIHeads
+from detectron2.modeling.roi_heads.roi_heads import ROI_HEADS_REGISTRY, Res5ROIHeads, select_foreground_proposals
 from .detic_fast_rcnn import DeticFastRCNNOutputLayers
 from torch.nn import functional as F
 from detectron2.utils.events import get_event_storage
@@ -119,7 +119,7 @@ class CustomRes5ROIHeads(Res5ROIHeads):
             sampled_idxs, gt_classes = self._sample_proposals(
                 matched_idxs, matched_labels, targets_per_image.gt_classes
             )
-            added_instances, group_info = self.context_modeling.sample(proposals_per_image)
+            added_instances, group_info = self.context_modeling.sample(proposals_per_image, self.mask_on)
             group_infos.append(group_info)
             # sample type: -1 for topk; 0 for det; 1 for clip-img; 2 for caption
 
@@ -207,3 +207,63 @@ class CustomRes5ROIHeadsExtraNorm(CustomRes5ROIHeads):
         norm = get_norm(norm, out_channels)
         seq.add_module("norm", norm)
         return seq, out_channels
+
+    def forward(self, images, features, proposals, targets=None,
+                ann_types=None, clip_images=None, image_info=None,
+                resized_image_info=None):
+        '''
+        enable debug and image labels
+        '''
+        del images
+        if self.training:
+            proposals, group_infos = self.label_and_sample_proposals(
+                proposals, targets, ann_types=ann_types)
+
+        proposal_boxes = [x.proposal_boxes for x in proposals]
+        box_features = self._shared_roi_transform(
+            [features[f] for f in self.in_features], proposal_boxes
+        )
+
+        if self.training:
+            del features
+            storage = get_event_storage()
+            tik = time()
+            predictions = self._box_forward_train(box_features, proposals)
+            losses = self.box_predictor.losses(predictions,
+                                               [p[p.sample_types == 0] for p in proposals])
+            tok = time()
+            # print('detector loss:', tok - tik)
+            storage.put_scalar("time/detector_forward", np.float32(tok - tik))
+
+            # TODO contrastive learning
+            if self.context_modeling_cfg.ENABLE:
+                losses.update(self.context_modeling.get_loss(group_infos,
+                                                             predictions, clip_images,
+                                                             self.box_predictor.clip, image_info))
+                storage.put_scalar("time/contrast_learning", np.float32(time() - tok))
+
+            if self.cfg.MODEL.WITH_IMAGE_LABELS:
+                loss = self.image_label_loss(resized_image_info)
+                if loss is None:
+                    loss = list(losses.values())[0] * 0.0
+                losses.update(image_label_loss=loss)
+
+            if self.mask_on:
+                proposals, fg_selection_masks = select_foreground_proposals(
+                    [p[p.sample_types == 0] for p in proposals], self.num_classes
+                )
+                # Since the ROI feature transform is shared between boxes and masks,
+                # we don't need to recompute features. The mask loss is only defined
+                # on foreground proposals, so we need to select out the foreground
+                # features.
+                mask_features = box_features[torch.cat(fg_selection_masks, dim=0)]
+                del box_features
+                losses.update(self.mask_head(mask_features, proposals))
+
+            return proposals, losses
+        else:
+            predictions = self.box_predictor(
+                box_features.mean(dim=[2, 3]))
+            pred_instances, _ = self.box_predictor.inference(predictions, proposals)
+            pred_instances = self.forward_with_given_boxes(features, pred_instances)
+            return pred_instances, {}

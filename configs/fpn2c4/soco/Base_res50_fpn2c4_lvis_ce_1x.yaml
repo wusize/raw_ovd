@@ -1,7 +1,7 @@
 MODEL:
   PIXEL_MEAN: [ 123.675, 116.280, 103.530 ]
   PIXEL_STD: [ 58.395, 57.120, 57.375 ]
-  WEIGHTS: "models/res50_fpn_soco_star_400.pkl"
+  WEIGHTS: "models/res50_c4_soco_400.pkl"
   MASK_ON: True
   META_ARCHITECTURE: "CustomRCNN"
   BACKBONE:
@@ -11,26 +11,20 @@ MODEL:
     DEPTH: 50
     STRIDE_IN_1X1: False
     NORM: "SyncBN"
-    OUT_FEATURES: [ "res2", "res3", "res4", "res5" ]
+    OUT_FEATURES: [ "res2", "res3", "res4" ]
   FPN:
     NORM: "SyncBN"
-    IN_FEATURES: [ "res2", "res3", "res4", "res5" ]
+    IN_FEATURES: [ "res2", "res3", "res4" ]
   PROPOSAL_GENERATOR:
     NAME: "CustomRPN"
   RPN:
     PRE_NMS_TOPK_TEST: 6000
     POST_NMS_TOPK_TEST: 1000
   ROI_HEADS:
-    NAME: 'CustomStandardROIHeads'
-    IN_FEATURES: ["res4"]
+    NAME: 'CustomRes5ROIHeadsExtraNorm'
     NUM_CLASSES: 1203
     SCORE_THRESH_TEST: 0.0001
   ROI_BOX_HEAD:
-    NAME: "FastRCNNConvFCHead"
-    NUM_CONV: 4
-    NUM_FC: 1
-    NORM: "SyncBN"
-    POOLER_RESOLUTION: 7
     RANDOM_DROPOUT: 0.5
     NORM_TEMP: 50.0
     USE_BIAS: 0.0
