@@ -19,6 +19,8 @@ def process_proposals(batched_inputs, images, proposals):
 
 def save_features(features, image_names, out_path):
     os.makedirs(out_path, exist_ok=True)
+    out_path = os.path.join(out_path, 'features')
+    os.makedirs(out_path, exist_ok=True)
     tar_shape = list(features.values())[0].shape[2:]
     for k, v in features.items():
         v = v.max(1, keepdim=True).values.cpu()
