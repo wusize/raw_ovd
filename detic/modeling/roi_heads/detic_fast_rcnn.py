@@ -14,6 +14,8 @@ from torch.cuda.amp import autocast
 from ..utils import load_class_freq, get_fed_loss_inds
 from .zero_shot_classifier import ZeroShotClassifier
 from detic.modeling import clip as CLIP
+from itertools import permutations
+import random
 
 __all__ = ["DeticFastRCNNOutputLayers"]
 
@@ -102,6 +104,8 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         nn.init.constant_(self.bbox_pred[-1].bias, 0)
 
         self.word_dropout = self.cfg.MODEL.ROI_BOX_HEAD.RANDOM_DROPOUT
+        if self.MODEL.ROI_BOX_HEAD.SHUFFLE:
+            self.word_perms = list(permutations(range(num_words)))
 
     @classmethod
     def from_config(cls, cfg, input_shape):
@@ -330,6 +334,9 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
 
     def pred_words(self, x):
         pseudo_words = self.word_pred(x).view(-1, self.num_words, self.word_embed_dim)
+        if self.cfg.MODEL.ROI_BOX_HEAD.SHUFFLE and self.training:
+            num_preds = pseudo_words.shape[0]
+            sampled_perms = random.choices(self.word_perms, )
 
         return pseudo_words
 
