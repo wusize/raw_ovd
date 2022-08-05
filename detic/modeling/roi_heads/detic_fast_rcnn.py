@@ -336,7 +336,14 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         pseudo_words = self.word_pred(x).view(-1, self.num_words, self.word_embed_dim)
         if self.cfg.MODEL.ROI_BOX_HEAD.SHUFFLE and self.training:
             num_preds = pseudo_words.shape[0]
-            sampled_perms = random.choices(self.word_perms, )
+            sampled_perms = torch.tensor(random.choices(self.word_perms, k=num_preds),
+                                         device=pseudo_words.device).long()
+            sampled_perms = sampled_perms + torch.arange(num_preds,
+                                                         device=pseudo_words.device
+                                                         )[:, None] * self.num_words
+            sampled_perms = sampled_perms.view(-1)
+            pseudo_words = pseudo_words.view(-1, self.word_embed_dim)[sampled_perms]
+            pseudo_words = pseudo_words.view(-1, self.num_words, self.word_embed_dim)
 
         return pseudo_words
 
