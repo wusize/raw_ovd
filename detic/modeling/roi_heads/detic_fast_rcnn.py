@@ -104,7 +104,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         nn.init.constant_(self.bbox_pred[-1].bias, 0)
 
         self.word_dropout = self.cfg.MODEL.ROI_BOX_HEAD.RANDOM_DROPOUT
-        if self.MODEL.ROI_BOX_HEAD.SHUFFLE:
+        if self.cfg.MODEL.ROI_BOX_HEAD.SHUFFLE:
             self.word_perms = list(permutations(range(num_words)))
 
     @classmethod
