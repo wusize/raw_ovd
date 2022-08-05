@@ -47,7 +47,7 @@ class C4FPNStandardROIHeads(StandardROIHeads):
             sampling_ratio=sampling_ratio,
             pooler_type=pooler_type,
         )
-        self.merge_fc = nn.Linear(2048 + standard_channels, standard_channels)
+        self.merge_fc = nn.Linear(2048, standard_channels)
 
     @classmethod
     def from_config(cls, cfg, input_shape):
@@ -186,7 +186,7 @@ class C4FPNStandardROIHeads(StandardROIHeads):
         c4_feature = backbone.bottom_up.res5(c4_feature)
         c4_feature = c4_feature.mean(dim=[2, 3])
 
-        return self.merge_fc(torch.cat([box_features, c4_feature], dim=-1))
+        return self.merge_fc(c4_feature)
 
     def _forward_box(self, features, proposals,
                      clip_images=None, image_info=None,
