@@ -14,7 +14,8 @@ from detectron2.structures import pairwise_iou
 from detic.modeling.roi_heads.context_modelling import ContextModelling
 from time import time
 from detectron2.modeling.poolers import ROIPooler
-import torch.nn as nn
+# import torch.nn as nn
+from detectron2.layers import ShapeSpec
 
 
 @ROI_HEADS_REGISTRY.register()
@@ -26,7 +27,7 @@ class C4FPNStandardROIHeads(StandardROIHeads):
         self.ws_num_props = cfg.MODEL.ROI_BOX_HEAD.WS_NUM_PROPS
         self.image_box_size = cfg.MODEL.ROI_BOX_HEAD.IMAGE_BOX_SIZE
         self.box_predictor = DeticFastRCNNOutputLayers(
-            cfg,  self.box_head.output_shape
+            cfg,  ShapeSpec(channels=2048, height=None, width=None, stride=None)
         )
 
         self.context_modeling_cfg = cfg.CONTEXT_MODELLING
@@ -40,14 +41,14 @@ class C4FPNStandardROIHeads(StandardROIHeads):
         pooler_resolution = cfg.MODEL.ROI_BOX_HEAD.POOLER_RESOLUTION
         pooler_type = cfg.MODEL.ROI_BOX_HEAD.POOLER_TYPE
         sampling_ratio = cfg.MODEL.ROI_BOX_HEAD.POOLER_SAMPLING_RATIO
-        standard_channels = self.box_head.output_shape.channels
+        # standard_channels = self.box_head.output_shape.channels
         self.c4_pooler = ROIPooler(
-            output_size=pooler_resolution,  # will be reduced by res5
+            output_size=pooler_resolution * 2,  # will be reduced by res5
             scales=[1 / 16],
             sampling_ratio=sampling_ratio,
             pooler_type=pooler_type,
         )
-        self.merge_fc = nn.Linear(2048, standard_channels)
+        # self.merge_fc = nn.Linear(2048, standard_channels)
 
     @classmethod
     def from_config(cls, cfg, input_shape):
@@ -186,17 +187,17 @@ class C4FPNStandardROIHeads(StandardROIHeads):
         c4_feature = backbone.bottom_up.res5(c4_feature)
         c4_feature = c4_feature.mean(dim=[2, 3])
 
-        return self.merge_fc(c4_feature)
+        return c4_feature
 
     def _forward_box(self, features, proposals,
                      clip_images=None, image_info=None,
                      resized_image_info=None, group_infos=None, backbone=None):
         c4_feature = features['res4']
-        features = [features[f] for f in self.box_in_features]
-        box_features = self.box_pooler(features, [x.proposal_boxes for x in proposals])
-        box_features = self.box_head(box_features)
+        # features = [features[f] for f in self.box_in_features]
+        # box_features = self.box_pooler(features, [x.proposal_boxes for x in proposals])
+        # box_features = self.box_head(box_features)
 
-        box_features = self._add_c4_box_feature(box_features, c4_feature,
+        box_features = self._add_c4_box_feature(None, c4_feature,
                                                 [x.proposal_boxes for x in proposals],
                                                 backbone)
         if self.training:
