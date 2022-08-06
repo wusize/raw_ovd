@@ -55,6 +55,15 @@ class C4FPN(FPN):
 
         return outputs
 
+    def output_shape(self):
+        """
+        Returns:
+            dict[str->ShapeSpec]
+        """
+        shapes = super(C4FPN, self).output_shape()
+        shapes.update(res4=ShapeSpec(channels=1024, height=None, width=None, stride=16))
+        return shapes
+
 
 @BACKBONE_REGISTRY.register()
 def build_resnet_c4fpn_backbone(cfg, input_shape: ShapeSpec):
