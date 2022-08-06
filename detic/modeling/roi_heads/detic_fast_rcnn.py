@@ -78,7 +78,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
 
         assert (not self.dynamic_classifier) or (not self.use_fed_loss)
         input_size = input_shape.channels * (input_shape.width or 1) * (input_shape.height or 1)
-
+        self.input_size = input_size
         # clip_cfg,
         self.num_words = num_words
         self.word_embed_dim = word_embed_dim
@@ -104,8 +104,6 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         nn.init.constant_(self.bbox_pred[-1].bias, 0)
 
         self.word_dropout = self.cfg.MODEL.ROI_BOX_HEAD.RANDOM_DROPOUT
-        if self.cfg.MODEL.ROI_BOX_HEAD.SHUFFLE:
-            self.word_perms = list(permutations(range(num_words)))
 
     @classmethod
     def from_config(cls, cfg, input_shape):
@@ -132,8 +130,14 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         })
         ret['cls_score'] = ZeroShotClassifier(cfg, input_shape)
         cls.cfg = cfg
+        if cfg.MODEL.ROI_BOX_HEAD.SHUFFLE:
+            cls.word_perms = list(permutations(
+                range(cfg.MODEL.ROI_BOX_HEAD.NUM_WORDS)))
 
         return ret
+
+    def pred_box(self, x):
+        return self.bbox_pred(x)
 
     def losses(self, predictions, proposals, \
         use_advanced_loss=True):
@@ -393,6 +397,43 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         predictions = dict()
         predictions.update(pseudo_words=self.pred_words(x))
         predictions.update(scores=self.pred_cls_score(predictions['pseudo_words']))
-        predictions.update(proposal_deltas=self.bbox_pred(x))
+        predictions.update(proposal_deltas=self.pred_box(x))
 
         return predictions
+
+
+class MultiLevelFastRCNNOutputLayers(DeticFastRCNNOutputLayers):
+    @classmethod
+    def from_config(cls, cfg, input_shape):
+        ret = super().from_config(cfg, input_shape)
+        cls.cfg = cfg
+        if cfg.MODEL.ROI_BOX_HEAD.SHUFFLE:
+            num_levels = len(cfg.MODEL.ROI_HEADS.IN_FEATURES)
+            cls.word_perms = list(permutations(
+                range(cfg.MODEL.ROI_BOX_HEAD.NUM_WORDS * num_levels)))
+
+        return ret
+
+    def pred_words(self, x):
+        num_levels = len(self.cfg.MODEL.ROI_HEADS.IN_FEATURES)
+        pseudo_words = self.word_pred(x).view(-1, num_levels * self.num_words,
+                                              self.word_embed_dim)
+        if self.cfg.MODEL.ROI_BOX_HEAD.SHUFFLE and self.training:
+            num_words = num_levels * self.num_words
+            num_preds = pseudo_words.shape[0]
+            sampled_perms = torch.tensor(random.choices(self.word_perms, k=num_preds),
+                                         device=pseudo_words.device).long()
+            sampled_perms = sampled_perms + torch.arange(num_preds,
+                                                         device=pseudo_words.device
+                                                         )[:, None] * num_words
+            sampled_perms = sampled_perms.view(-1)
+            pseudo_words = pseudo_words.view(-1, self.word_embed_dim)[sampled_perms]
+            pseudo_words = pseudo_words.view(-1, num_words, self.word_embed_dim)
+
+        return pseudo_words
+
+    def pred_box(self, x):
+        num_levels = len(self.cfg.MODEL.ROI_HEADS.IN_FEATURES)
+        x = x.view(-1, num_levels, self.input_size)
+        x = x.sum(dim=1)
+        return self.bbox_pred(x)
