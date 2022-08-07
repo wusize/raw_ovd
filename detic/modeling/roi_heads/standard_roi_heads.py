@@ -306,7 +306,7 @@ class FPNSumROIPooler(ROIPooler):
         self.merge_conv = nn.Conv2d(
             in_channels=in_channels * num_level_assignments,
             out_channels=in_channels,
-            kernel_size=(3, 3),
+            kernel_size=(1, 1),
             stride=1,
             padding=1,
         )
