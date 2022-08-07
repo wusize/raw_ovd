@@ -224,7 +224,7 @@ class CustomStandardROIHeads(StandardROIHeads):
 
 
 @ROI_HEADS_REGISTRY.register()
-class MaxFPNStandardROIHeads(CustomStandardROIHeads):
+class FPNSumStandardROIHeads(CustomStandardROIHeads):
     @classmethod
     def _init_box_head(cls, cfg, input_shape):
         # fmt: off
@@ -242,9 +242,7 @@ class MaxFPNStandardROIHeads(CustomStandardROIHeads):
         assert len(set(in_channels)) == 1, in_channels
         in_channels = in_channels[0]
 
-        box_pooler = FPNMaxROIPooler(
-            num_channels=in_channels,
-            conv_norm=cfg.MODEL.ROI_BOX_HEAD.NORM,
+        box_pooler = FPNSumROIPooler(
             output_size=pooler_resolution,
             scales=pooler_scales,
             sampling_ratio=sampling_ratio,
@@ -280,9 +278,7 @@ class MaxFPNStandardROIHeads(CustomStandardROIHeads):
 
         ret = {"mask_in_features": in_features}
         ret["mask_pooler"] = (
-            FPNMaxROIPooler(
-                num_channels=in_channels,
-                conv_norm=cfg.MODEL.ROI_MASK_HEAD.NORM,
+            FPNSumROIPooler(
                 output_size=pooler_resolution,
                 scales=pooler_scales,
                 sampling_ratio=sampling_ratio,
@@ -301,21 +297,7 @@ class MaxFPNStandardROIHeads(CustomStandardROIHeads):
         return ret
 
 
-class FPNMaxROIPooler(ROIPooler):
-    def __init__(self, num_channels, conv_norm, *args, **kwargs):
-        super(FPNMaxROIPooler, self).__init__(*args, **kwargs)
-        # self.conv = Conv2d(
-        #     num_channels,
-        #     num_channels,
-        #     kernel_size=3,
-        #     stride=1,
-        #     padding=1,
-        #     bias=not conv_norm,
-        #     norm=get_norm(conv_norm, num_channels),
-        #     activation=nn.LeakyReLU(),
-        # )
-        self.conv = nn.Identity()
-
+class FPNSumROIPooler(ROIPooler):
     def forward(self, x: List[torch.Tensor], box_lists: List[Boxes]):
         """
         Args:
@@ -358,13 +340,11 @@ class FPNMaxROIPooler(ROIPooler):
             return self.level_poolers[0](x[0], pooler_fmt_boxes)
 
         # target_shape = x[1].shape[2:]   # resize to level1  1/8
-        batch_size, num_channels, h, w = x[1].shape
-        resized_x = torch.cat(
+        _, _, h, w = x[1].shape
+        resized_x = torch.stack(
             [F.interpolate(x_, size=[h, w],
                            mode="bilinear",
                            align_corners=False) for x_ in x], dim=0)
-        resized_x = self.conv(resized_x).view(num_level_assignments,
-                                              batch_size, num_channels, h, w)
-        resized_x = resized_x.max(0).values
+        resized_x = resized_x.sum(0)
 
         return self.level_poolers[1](resized_x, pooler_fmt_boxes)     # sample at level1  1/8

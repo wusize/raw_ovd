@@ -1,19 +1,13 @@
 MODEL:
-  PIXEL_MEAN: [ 123.675, 116.280, 103.530 ]
-  PIXEL_STD: [ 58.395, 57.120, 57.375 ]
   PROPOSAL_GENERATOR:
     NAME: "CustomRPN"
   META_ARCHITECTURE: "CustomRCNN"
   BACKBONE:
     NAME: "build_resnet_fpn_backbone"
-    FREEZE_AT: 0
   RESNETS:
-    NORM: "SyncBN"
-    STRIDE_IN_1X1: False
     DEPTH: 50
     OUT_FEATURES: [ "res2", "res3", "res4", "res5" ]
   FPN:
-    NORM: "SyncBN"
     IN_FEATURES: [ "res2", "res3", "res4", "res5" ]
   ANCHOR_GENERATOR:
     SIZES: [ [ 32 ], [ 64 ], [ 128 ], [ 256 ], [ 512 ] ]  # One size for each in feature map
@@ -25,18 +19,16 @@ MODEL:
     POST_NMS_TOPK_TRAIN: 1000
     POST_NMS_TOPK_TEST: 1000
   ROI_HEADS:
-    NAME: "MaxFPNStandardROIHeads"
+    NAME: "FPNSumStandardROIHeads"
     IN_FEATURES: [ "p2", "p3", "p4", "p5" ]
-  WEIGHTS: "models/res50_fpn_soco_star_400.pkl"
+  WEIGHTS: "models/R-50.pkl"
   ROI_BOX_HEAD:
     RANDOM_DROPOUT: 0.5
     NORM_TEMP: 25.0
     USE_BIAS: -20.0
     NAME: "FastRCNNConvFCHead"
+    NUM_FC: 2
     POOLER_RESOLUTION: 7
-    NUM_CONV: 4
-    NORM: "SyncBN"
-    NUM_FC: 1
     CLS_AGNOSTIC_BBOX_REG: True
     USE_SIGMOID_CE: True
     USE_ZEROSHOT_CLS: True
@@ -56,19 +48,14 @@ DATASETS:
   TEST: ("coco_generalized_zeroshot_val",)
 SOLVER:
   IMS_PER_BATCH: 16
-  WEIGHT_DECAY: 0.000025
   BASE_LR: 0.02
   STEPS: (60000, 80000)
   MAX_ITER: 90000
   CHECKPOINT_PERIOD: 30000
 INPUT:
   MIN_SIZE_TRAIN: (800,)
-  FORMAT: "RGB"
 VERSION: 2
 OUTPUT_DIR: output/Detic-COCO/auto
 FP16: True
 DATALOADER:
   FILTER_EMPTY_ANNOTATIONS: True
-TEST:
-  PRECISE_BN:
-    ENABLED: True
