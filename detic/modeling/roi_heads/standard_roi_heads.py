@@ -308,7 +308,7 @@ class FPNSumROIPooler(ROIPooler):
             out_channels=in_channels,
             kernel_size=(1, 1),
             stride=1,
-            padding=1,
+            padding=0,
         )
 
     def forward(self, x: List[torch.Tensor], box_lists: List[Boxes]):
@@ -358,8 +358,8 @@ class FPNSumROIPooler(ROIPooler):
             [F.interpolate(x_, size=[h, w],
                            mode="bilinear",
                            align_corners=False) for x_ in x], dim=1)    # reduce channel
-        pooled_outputs = self.level_poolers[1](resized_x, pooler_fmt_boxes)
+        pooled_outputs = self.level_poolers[1](self.merge_conv(resized_x), pooler_fmt_boxes)
 
-        return self.merge_conv(pooled_outputs)
+        return pooled_outputs
 
         # return self.level_poolers[1](resized_x, pooler_fmt_boxes)     # sample at level1  1/8
