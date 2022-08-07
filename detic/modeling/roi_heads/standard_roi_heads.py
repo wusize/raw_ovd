@@ -21,7 +21,7 @@ from typing import List
 from detic.modeling.roi_heads.context_modelling import ContextModelling
 from time import time
 from detectron2.modeling.poolers import convert_boxes_to_pooler_format
-from detectron2.layers import Conv2d, get_norm
+
 
 @ROI_HEADS_REGISTRY.register()
 class CustomStandardROIHeads(StandardROIHeads):
@@ -243,6 +243,7 @@ class FPNSumStandardROIHeads(CustomStandardROIHeads):
         in_channels = in_channels[0]
 
         box_pooler = FPNSumROIPooler(
+            in_channels=in_channels,
             output_size=pooler_resolution,
             scales=pooler_scales,
             sampling_ratio=sampling_ratio,
@@ -279,6 +280,7 @@ class FPNSumStandardROIHeads(CustomStandardROIHeads):
         ret = {"mask_in_features": in_features}
         ret["mask_pooler"] = (
             FPNSumROIPooler(
+                in_channels=in_channels,
                 output_size=pooler_resolution,
                 scales=pooler_scales,
                 sampling_ratio=sampling_ratio,
@@ -298,6 +300,17 @@ class FPNSumStandardROIHeads(CustomStandardROIHeads):
 
 
 class FPNSumROIPooler(ROIPooler):
+    def __init__(self, in_channels, *args, **kwargs):
+        super(FPNSumROIPooler, self).__init__(*args, **kwargs)
+        num_level_assignments = len(self.level_poolers)
+        self.merge_conv = nn.Conv2d(
+            in_channels=in_channels * num_level_assignments,
+            out_channels=in_channels,
+            kernel_size=(3, 3),
+            stride=1,
+            padding=1,
+        )
+
     def forward(self, x: List[torch.Tensor], box_lists: List[Boxes]):
         """
         Args:
@@ -341,10 +354,12 @@ class FPNSumROIPooler(ROIPooler):
 
         # target_shape = x[1].shape[2:]   # resize to level1  1/8
         _, _, h, w = x[1].shape
-        resized_x = torch.stack(
+        resized_x = torch.cat(
             [F.interpolate(x_, size=[h, w],
                            mode="bilinear",
-                           align_corners=False) for x_ in x], dim=0)
-        resized_x = resized_x.sum(0)
+                           align_corners=False) for x_ in x], dim=1)    # reduce channel
+        pooled_outputs = self.level_poolers[1](resized_x, pooler_fmt_boxes)
 
-        return self.level_poolers[1](resized_x, pooler_fmt_boxes)     # sample at level1  1/8
+        return self.merge_conv(pooled_outputs)
+
+        # return self.level_poolers[1](resized_x, pooler_fmt_boxes)     # sample at level1  1/8
