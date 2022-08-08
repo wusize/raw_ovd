@@ -243,7 +243,6 @@ class FPNSumStandardROIHeads(CustomStandardROIHeads):
         in_channels = in_channels[0]
 
         box_pooler = FPNSumROIPooler(
-            in_channels=in_channels,
             output_size=pooler_resolution,
             scales=pooler_scales,
             sampling_ratio=sampling_ratio,
@@ -280,7 +279,6 @@ class FPNSumStandardROIHeads(CustomStandardROIHeads):
         ret = {"mask_in_features": in_features}
         ret["mask_pooler"] = (
             FPNSumROIPooler(
-                in_channels=in_channels,
                 output_size=pooler_resolution,
                 scales=pooler_scales,
                 sampling_ratio=sampling_ratio,
@@ -300,17 +298,6 @@ class FPNSumStandardROIHeads(CustomStandardROIHeads):
 
 
 class FPNSumROIPooler(ROIPooler):
-    def __init__(self, in_channels, *args, **kwargs):
-        super(FPNSumROIPooler, self).__init__(*args, **kwargs)
-        num_level_assignments = len(self.level_poolers)
-        self.merge_conv = nn.Conv2d(
-            in_channels=in_channels * num_level_assignments,
-            out_channels=in_channels,
-            kernel_size=(3, 3),
-            stride=1,
-            padding=1,
-        )
-
     def forward(self, x: List[torch.Tensor], box_lists: List[Boxes]):
         """
         Args:
@@ -352,14 +339,11 @@ class FPNSumROIPooler(ROIPooler):
         if num_level_assignments == 1:
             return self.level_poolers[0](x[0], pooler_fmt_boxes)
 
-        # target_shape = x[1].shape[2:]   # resize to level1  1/8
-        _, _, h, w = x[1].shape
-        resized_x = torch.cat(
-            [F.interpolate(x_, size=[h, w],
+        target_shape = x[1].shape[2:]   # resize to level1  1/8
+        resized_x = torch.stack(
+            [F.interpolate(x_, size=target_shape,
                            mode="bilinear",
-                           align_corners=False) for x_ in x], dim=1)    # reduce channel
-        # pooled_outputs = self.level_poolers[1](self.merge_conv(resized_x), pooler_fmt_boxes)
-        pooled_outputs = self.merge_conv(self.level_poolers[1](resized_x, pooler_fmt_boxes))
-        return pooled_outputs
+                           align_corners=False) for x_ in x], dim=0)    # stack at dim 0
+        resized_x = resized_x.sum(0)
 
-        # return self.level_poolers[1](resized_x, pooler_fmt_boxes)     # sample at level1  1/8
+        return self.level_poolers[1](resized_x, pooler_fmt_boxes)     # sample at level1  1/8
