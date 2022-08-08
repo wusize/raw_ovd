@@ -38,12 +38,12 @@ class C4FPNStandardROIHeads(StandardROIHeads):
                                                  word_embed_dim=self.box_predictor.word_embed_dim,
                                                  word_dropout=self.box_predictor.word_dropout)
 
-        pooler_resolution = cfg.MODEL.ROI_BOX_HEAD.POOLER_RESOLUTION
+        pooler_resolution = cfg.MODEL.ROI_BOX_HEAD.POOLER_RESOLUTION     # defined as 14 (for c4)
         pooler_type = cfg.MODEL.ROI_BOX_HEAD.POOLER_TYPE
         sampling_ratio = cfg.MODEL.ROI_BOX_HEAD.POOLER_SAMPLING_RATIO
         # standard_channels = self.box_head.output_shape.channels
         self.c4_pooler = ROIPooler(
-            output_size=pooler_resolution * 2,  # will be reduced by res5
+            output_size=pooler_resolution,  # will be reduced by res5
             scales=[1 / 16],
             sampling_ratio=sampling_ratio,
             pooler_type=pooler_type,

@@ -28,7 +28,7 @@ MODEL:
     USE_BIAS: -20.0
     NAME: "FastRCNNConvFCHead"
     NUM_FC: 2
-    POOLER_RESOLUTION: 7
+    POOLER_RESOLUTION: 14  # 7 x 2 for c4 feature
     CLS_AGNOSTIC_BBOX_REG: True
     USE_SIGMOID_CE: True
     USE_ZEROSHOT_CLS: True
