@@ -1,0 +1,41 @@
+_BASE_: "./Base_res50_sum_fpn_lvis_ce_1x.yaml"
+MODEL:
+  ROI_BOX_HEAD:
+    NORM_TEMP: 50.0
+    USE_BIAS: 0.0
+    USE_SIGMOID_CE: False
+    IGNORE_ZERO_CATS: False
+  CLIP:
+    USE_IMAGE_ENCODER: True
+  ROI_HEADS:
+    SCORE_THRESH_TEST: 0.0002
+
+SOLVER:
+  CHECKPOINT_PERIOD: 30000
+
+CONTEXT_MODELLING:
+  ENABLE: True
+  CONTRAST_LOSS_WEIGHT: 1.0
+  TOKEN_LOSS_WEIGHT: 0.1
+  TOPK: 500
+  OBJECTNESS_THR: 0.85
+  SHAPE_RATIO_THR: 0.25
+  POSITIONAL_ENCODING: True
+  CE_TEMP: 30.0
+  TOKEN_TEMP: 50.0
+  CHECKBOARD:
+    ENABLE: True
+    NMS_THR: 0.1
+    AREA_RATIO_THR: 0.01
+    BASE_PROBABILITY: 0.3
+    MAX_GROUPS: 4
+    MAX_PERMUTATIONS: 2
+    ALPHA: 3.0
+    CUT_OFF_THR: 0.3
+    INTERVAL: -0.2
+    LOCAL_CORRESPONDENCE: True
+  CAPTION:
+    ENABLE: False
+  QUEUE:
+    LENGTHS: [1024, 1024, 1024, 1024]
+    NAMES: ['clip_text_features', 'clip_image_features', 'clip_word_features', 'clip_patch_features']
