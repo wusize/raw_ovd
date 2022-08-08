@@ -47,7 +47,7 @@ MODEL:
     USE_ZEROSHOT_CLS: True
     USE_SIGMOID_CE: False
     USE_FED_LOSS: False
-    IGNORE_ZERO_CATS: False
+    IGNORE_ZERO_CATS: False              # do not ignore zero cats
     ZEROSHOT_WEIGHT_PATH: 'datasets/metadata/lvis_v1_clip_att12.npy'
     CAT_FREQ_PATH: 'datasets/metadata/lvis_v1_train_cat_info.json'
     NUM_WORDS: 4
