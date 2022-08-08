@@ -358,8 +358,8 @@ class FPNSumROIPooler(ROIPooler):
             [F.interpolate(x_, size=[h, w],
                            mode="bilinear",
                            align_corners=False) for x_ in x], dim=1)    # reduce channel
-        pooled_outputs = self.level_poolers[1](self.merge_conv(resized_x), pooler_fmt_boxes)
-
+        # pooled_outputs = self.level_poolers[1](self.merge_conv(resized_x), pooler_fmt_boxes)
+        pooled_outputs = self.merge_conv(self.level_poolers[1](resized_x, pooler_fmt_boxes))
         return pooled_outputs
 
         # return self.level_poolers[1](resized_x, pooler_fmt_boxes)     # sample at level1  1/8
