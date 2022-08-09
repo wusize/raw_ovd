@@ -24,8 +24,8 @@ MODEL:
   WEIGHTS: "models/R-50.pkl"
   ROI_BOX_HEAD:
     RANDOM_DROPOUT: 0.5
-    NORM_TEMP: 50.0
-    USE_BIAS: 0.0      # discard bias -> let learning be harder
+    NORM_TEMP: 25
+    USE_BIAS: 20
     NAME: "FastRCNNConvFCHead"
     NUM_FC: 2
     POOLER_RESOLUTION: 7

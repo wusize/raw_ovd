@@ -1,5 +1,9 @@
 _BASE_: "./Base_OVCOCO_SUM_FPN_1x.yaml"
 MODEL:
+  ROI_BOX_HEAD:
+    USE_SIGMOID_CE: True
+    NORM_TEMP: 50
+    USE_BIAS: 45
   CLIP:
     USE_IMAGE_ENCODER: True
   WITH_IMAGE_LABELS: False
