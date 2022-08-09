@@ -1,11 +1,5 @@
 _BASE_: "./Base_OVCOCO_SUM_FPN_1x.yaml"
 MODEL:
-  ROI_BOX_HEAD:
-    RANDOM_DROPOUT: 0.5
-    NORM_TEMP: 25.0
-    USE_BIAS: 0.0       # make learning harder
-  PROPOSAL_GENERATOR:
-    NAME: "CustomRPN"
   CLIP:
     USE_IMAGE_ENCODER: True
   WITH_IMAGE_LABELS: False
