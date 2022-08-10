@@ -4,6 +4,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from detectron2.config import configurable
+from detectron2.utils.events import get_event_storage
 
 
 class ZeroShotClassifier(nn.Module):
@@ -62,4 +63,8 @@ class ZeroShotClassifier(nn.Module):
         x = torch.mm(x, zs_weight)
         if self.use_bias and self.training:
             x = x + self.cls_bias
+            if not self.cfg.MODEL.ROI_BOX_HEAD.FIX_BIAS:
+                storage = get_event_storage()
+                value = self.cls_bias.item()
+                storage.put_scalar("time/classifier_bias", np.float32(value))
         return x
