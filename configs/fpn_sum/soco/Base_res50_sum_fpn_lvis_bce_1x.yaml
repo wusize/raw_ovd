@@ -33,7 +33,7 @@ MODEL:
     NAME: 'FPNSumStandardROIHeads'
     IN_FEATURES: ["p2", "p3", "p4", "p5"]
     NUM_CLASSES: 1203
-    SCORE_THRESH_TEST: 0.01
+    SCORE_THRESH_TEST: 0.001
   ROI_BOX_HEAD:
     NAME: "FastRCNNConvFCHead"
     NUM_CONV: 4
@@ -41,7 +41,7 @@ MODEL:
     NORM: "SyncBN"
     POOLER_RESOLUTION: 7
     RANDOM_DROPOUT: 0.5
-    NORM_TEMP: 25.0    # bce setting
+    NORM_TEMP: 50.0    # bce setting
     USE_BIAS: -20.0     # bce setting
     CLS_AGNOSTIC_BBOX_REG: True
     USE_ZEROSHOT_CLS: True
@@ -52,7 +52,7 @@ MODEL:
     CAT_FREQ_PATH: 'datasets/metadata/lvis_v1_train_cat_info.json'
     NUM_WORDS: 4
     WORD_EMBED_DIM: 512
-    CLS_LOSS_WEIGHT: 1.5     # fpn setting?
+    CLS_LOSS_WEIGHT: 1.0     # fpn setting?
   CLIP:
     NAME: 'ViT-B/32'
     USE_IMAGE_ENCODER: False
