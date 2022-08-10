@@ -41,8 +41,8 @@ MODEL:
     NORM: "SyncBN"
     POOLER_RESOLUTION: 7
     RANDOM_DROPOUT: 0.5
-    NORM_TEMP: 50.0    # bce setting
-    USE_BIAS: -45.0     # bce setting
+    NORM_TEMP: 25.0    # bce setting
+    USE_BIAS: -20.0     # bce setting
     CLS_AGNOSTIC_BBOX_REG: True
     USE_ZEROSHOT_CLS: True
     USE_SIGMOID_CE: True        # bce setting
