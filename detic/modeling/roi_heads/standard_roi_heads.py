@@ -339,11 +339,11 @@ class FPNSumROIPooler(ROIPooler):
         if num_level_assignments == 1:
             return self.level_poolers[0](x[0], pooler_fmt_boxes)
 
-        target_shape = x[1].shape[2:]   # resize to level1  1/8
+        target_shape = x[2].shape[2:]   # resize to level2  1/16
         resized_x = torch.stack(
             [F.interpolate(x_, size=target_shape,
                            mode="bilinear",
                            align_corners=False) for x_ in x], dim=0)    # stack at dim 0
         resized_x = resized_x.sum(0)
 
-        return self.level_poolers[1](resized_x, pooler_fmt_boxes)     # sample at level1  1/8
+        return self.level_poolers[2](resized_x, pooler_fmt_boxes)     # sample at level1  1/16
