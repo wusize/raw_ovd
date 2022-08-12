@@ -1,4 +1,4 @@
-_BASE_: "./Base_OVCOCO_DC5_1x.yaml"
+_BASE_: "./Base_OVCOCO_FPN_DC5_1x.yaml"
 MODEL:
   CLIP:
     USE_IMAGE_ENCODER: True
