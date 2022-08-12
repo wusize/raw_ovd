@@ -96,7 +96,8 @@ class DC5ResNet(ResNet):
         output = super(DC5ResNet, self).forward(x)
         dilated_res5 = output['res5']
         res5 = F.interpolate(dilated_res5, scale_factor=0.5,
-                             mode='bilinear', align_corners=False)  # downsample for fpn
+                             mode='bilinear', align_corners=False,
+                             recompute_scale_factor=False)  # downsample for fpn
         output.update(res5=res5,
                       dilated_res5=dilated_res5)
 
