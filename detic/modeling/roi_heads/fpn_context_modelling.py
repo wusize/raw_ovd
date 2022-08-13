@@ -68,7 +68,8 @@ class FPNContextModelling(nn.Module):
                                caption_pseudo_words=pseudo_words[sample_types == 2])
             level_losses = self.fpn_context_modellings[i].get_loss(group_infos, predictions,
                                                                    clip_images, clip_model, image_info)
+            loss_weight = self.cfg.CONTEXT_MODELLING.WEIGHTS_PER_LEVEL[i]
             for k, v in level_losses.items():
-                losses[k + f'_{i}'] = v
+                losses[k + f'_{i}'] = v * loss_weight
 
         return losses
