@@ -13,14 +13,14 @@ MODEL:
   RPN:
     IN_FEATURES: [ "p2", "p3", "p4", "p5", "p6" ]
     PRE_NMS_TOPK_TRAIN: 2000  # Per FPN level
-    PRE_NMS_TOPK_TEST: 1000  # Per FPN level
+    PRE_NMS_TOPK_TEST: 2000    # 1000->2000 (for training)  # Per FPN level
     POST_NMS_TOPK_TRAIN: 1000
-    POST_NMS_TOPK_TEST: 2000
+    POST_NMS_TOPK_TEST: 1000   # 2000 -> 1000 (for training)
   WEIGHTS: "models/R-50.pkl"
 
 DATASETS:
   TRAIN: ("coco_zeroshot_train_oriorder",)
-  TEST: ("coco_generalized_zeroshot_val",)
+  TEST: ("coco_2017_train",)
 SOLVER:
   IMS_PER_BATCH: 16
   BASE_LR: 0.02

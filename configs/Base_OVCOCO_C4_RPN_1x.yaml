@@ -2,14 +2,14 @@ MODEL:
   META_ARCHITECTURE: "ProposalNetwork"
   RPN:
     PRE_NMS_TOPK_TEST: 12000
-    POST_NMS_TOPK_TEST: 2000
+    POST_NMS_TOPK_TEST: 1000
   WEIGHTS: "models/R-50.pkl"
   RESNETS:
     DEPTH: 50
 
 DATASETS:
   TRAIN: ("coco_zeroshot_train_oriorder",)
-  TEST: ("coco_generalized_zeroshot_val",)
+  TEST: ("coco_2017_train",)
 SOLVER:
   IMS_PER_BATCH: 16
   BASE_LR: 0.02
