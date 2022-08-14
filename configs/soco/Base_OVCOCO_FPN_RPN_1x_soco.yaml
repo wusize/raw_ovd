@@ -1,4 +1,4 @@
-_BASE_: "./Base_OVCOCO_C4_1x_soco.yaml"
+_BASE_: "./Base_OVCOCO_FPN_1x_soco.yaml"
 MODEL:
   PROPOSAL_GENERATOR:
     NAME: "RPN"
