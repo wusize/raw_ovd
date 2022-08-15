@@ -14,6 +14,7 @@ from torch.cuda.amp import autocast
 from ..utils import load_class_freq, get_fed_loss_inds
 from .zero_shot_classifier import ZeroShotClassifier
 from detic.modeling import clip as CLIP
+from detectron2.utils.events import get_event_storage
 
 __all__ = ["DeticFastRCNNOutputLayers"]
 
@@ -352,7 +353,14 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
 
         return valid_mask
 
+    @staticmethod
+    def _record_gradient(grad):
+        val = grad.norm()
+        storage = get_event_storage()
+        storage.put_scalar("gradients/classification", val.cpu().numpy())
+
     def pred_cls_score(self, pseudo_words, **kwargs):
+        pseudo_words.register_hook(self._record_gradient)
         clip_model = self.clip
         if pseudo_words.shape[0] == 0:
             return pseudo_words.new_zeros(0, self.num_classes + 1)

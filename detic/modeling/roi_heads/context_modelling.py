@@ -415,9 +415,15 @@ class ContextModelling(nn.Module):
 
         cnt += 1e-12
         storage = get_event_storage()
-        storage.put_scalar(f"{name}/background", num_bg / cnt)
-        storage.put_scalar(f"{name}/novel", num_novel / cnt)
-        storage.put_scalar(f"{name}/base", num_base / cnt)
+        storage.put_scalar(f"{name}/background", np.float32(num_bg / cnt))
+        storage.put_scalar(f"{name}/novel", np.float32(num_novel / cnt))
+        storage.put_scalar(f"{name}/base", np.float32(num_base / cnt))
+
+    @staticmethod
+    def _record_gradient(grad):
+        val = grad.norm()
+        storage = get_event_storage()
+        storage.put_scalar("gradients/contrastive", val.cpu().numpy())
 
     def kd_clip_contrast(self,
                          group_info,
@@ -427,6 +433,7 @@ class ContextModelling(nn.Module):
         self.record_class_proportions([g['sampled_instances'] for g in group_info],
                                       list(image_info.keys()), 'sampled_proportions')
         pseudo_words = predictions.pop('kd_pseudo_words')
+        pseudo_words.register_hook(self._record_gradient)
         device = pseudo_words.device
         storage = get_event_storage()
         storage.put_scalar("num_proposals/contrast_proposals", np.float32(pseudo_words.shape[0]))

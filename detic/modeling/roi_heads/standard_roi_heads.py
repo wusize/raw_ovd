@@ -2,7 +2,6 @@
 from detectron2.structures.instances import Instances
 from detectron2.structures.boxes import Boxes
 import torch
-import torch.nn as nn
 import numpy as np
 from detectron2.config import configurable
 from detectron2.modeling.roi_heads.roi_heads import ROI_HEADS_REGISTRY, StandardROIHeads
@@ -170,28 +169,10 @@ class CustomStandardROIHeads(StandardROIHeads):
 
         return proposals_with_gt, group_infos
 
-    @staticmethod
-    def _record_base_gradient(grad):
-        val = grad.norm()
-        storage = get_event_storage()
-        storage.put_scalar("gradients/base", val.cpu().numpy())
-
-    @staticmethod
-    def _record_novel_gradient(grad):
-        val = grad.norm()
-        storage = get_event_storage()
-        storage.put_scalar("gradients/novel", val.cpu().numpy())
-
     def _box_forward_train(self, box_features, proposals):
         sample_types = torch.cat([p.sample_types for p in proposals], dim=0)
         input_box_features = self.box_predictor.pre_forward(box_features)
         del box_features
-
-        # TODO record gradient
-        base_box_features = input_box_features[sample_types == 0]
-        novel_box_features = input_box_features[sample_types > 0]
-        base_box_features.register_hook(self._record_base_gradient)
-        novel_box_features.register_hook(self._record_novel_gradient)
 
         pseudo_words = self.box_predictor.pred_words(input_box_features)
         storage = get_event_storage()
