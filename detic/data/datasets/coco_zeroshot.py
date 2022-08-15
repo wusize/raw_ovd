@@ -95,9 +95,11 @@ def _get_metadata(cat):
 
 
 _PREDEFINED_SPLITS_COCO = {
-    "coco_zeroshot_train": ("coco/train2017", "coco/zero-shot/instances_train2017_seen_2.json", 'seen'),
-    "coco_zeroshot_val": ("coco/val2017", "coco/zero-shot/instances_val2017_unseen_2.json", 'unseen'),
-    "coco_not_zeroshot_val": ("coco/val2017", "coco/zero-shot/instances_val2017_seen_2.json", 'seen'),
+    "coco_zeroshot_train": ("coco/train2017", "coco/zero-shot/instances_train2017_seen_2.json", 'seen'),  # train seen
+    "coco_zeroshot_val": ("coco/val2017", "coco/zero-shot/instances_val2017_unseen_2.json", 'unseen'),    # val unseen
+    "coco_not_zeroshot_val": ("coco/val2017", "coco/zero-shot/instances_val2017_seen_2.json", 'seen'),    # val seen
+    "coco_not_zeroshot_train": ("coco/train2017", "datasets/coco/annotations/instances_train2017_rare.json",
+                                'unseen'),  # train unseen
     "coco_generalized_zeroshot_val": ("coco/val2017", "coco/zero-shot/instances_val2017_all_2_oriorder.json", 'all'),
     "coco_zeroshot_train_oriorder": ("coco/train2017",
                                      "coco/zero-shot/instances_train2017_seen_2_oriorder_with_cap.json", 'all'),
