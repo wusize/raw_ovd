@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 from .stochastic_sampling import StochasticSampling
-from torchvision.ops import roi_align, nms
+from torchvision.ops import roi_align, nms, box_iou
 from .utils import (multi_apply, get_normed_boxes,
                     bbox_xyxy_to_cxcywh, repeat_crops_and_get_att_mask)
 from detectron2.structures import Instances, Boxes
@@ -15,6 +15,8 @@ from time import time
 from torch.cuda.amp import autocast
 from detic.modeling import clip as CLIP
 from detectron2.structures.masks import PolygonMasks
+from pycocotools.coco import COCO
+from detic.data.datasets.coco_zeroshot import categories_unseen
 
 
 def perm_generator(seq):
@@ -123,12 +125,39 @@ class ZeroPositionalEncoding(nn.Module):
 
 
 class ContextModelling(nn.Module):
+    # TODO: record base_novel_bg proportions
     def __init__(self, cfg, num_words, word_embed_dim, word_dropout, sigmoid=True):
         super(ContextModelling, self).__init__()
         self.num_words_per_pred = num_words
         self.word_embed_dim = word_embed_dim
         self.word_dropout = word_dropout
         self.cfg = cfg
+
+
+        # TODO add gts
+        gt_path = cfg.ALL_GTS
+        gt_coco = COCO(gt_path)
+        images = {}
+        # id_map = {v: i for i, v in enumerate(sorted(list(gt_coco.cats.keys())))}
+        if cfg.DATASET == 'COCO':
+            unseen_cat_ids = [cat['id'] for cat in categories_unseen]
+        else:
+            raise NotImplementedError
+        for img_id, anns in gt_coco.imgToAnns.items():
+            gt_boxes = torch.tensor([ann['bbox'] for ann in anns])
+            gt_boxes[:, 2:] = gt_boxes[:, 2:] + gt_boxes[:, :2]
+            # gt_classes = torch.tensor([id_map[ann['category_id']] for ann in anns]).long()
+            gt_is_unseen = torch.tensor([1 if ann['category_id'] in unseen_cat_ids else 0
+                                         for ann in anns])
+
+            img_info = gt_coco.imgs[img_id]
+            image_size = (img_info['height'], img_info['width'])
+
+            images[img_id] = dict(gt_boxes=gt_boxes, gt_is_unseen=gt_is_unseen,
+                                  image_size=image_size)
+
+        self.images = images
+
         checkboard_cfg = cfg.CHECKBOARD
         if sigmoid:
             self.get_objectness = torch.sigmoid
@@ -233,6 +262,7 @@ class ContextModelling(nn.Module):
 
         return added_instances, dict(normed_boxes=normed_boxes,
                                      spanned_boxes=spanned_boxes,
+                                     sampled_instances=added_instances,
                                      box_ids=box_ids)
 
     def _caption_sampling(self, topk_proposals, mask_on=False):
@@ -357,11 +387,45 @@ class ContextModelling(nn.Module):
 
         return clip_img_features.float(), clip_img_tokens.float()
 
+    def record_class_proportions(self, sampled_instances, image_ids, name):
+        num_bg = 0
+        num_novel = 0
+        num_base = 0
+        cnt = 0
+        for img_id, inst in zip(image_ids, sampled_instances):
+            if img_id not in self.images:
+                continue
+            image_size = inst.image_size
+            gt = self.images[img_id]
+            gt_image_size = gt['image_size']
+            sampled_boxes = inst.proposal_boxes
+            sampled_boxes.scale(gt_image_size[1] / image_size[1],
+                                gt_image_size[0] / image_size[0])
+            device = sampled_boxes.device
+            gt_boxes = gt['gt_boxes'].to(device)
+            gt_is_unseen = gt['gt_is_unseen'].to(device)
+            ious = box_iou(sampled_boxes.tensor, gt_boxes)
+            ious, matched_gts = ious.max(1)
+            is_unseen = gt_is_unseen[matched_gts]
+            is_unseen = is_unseen[ious >= 0.5]
+            num_bg += (ious < 0.5).sum().item()
+            num_novel += (is_unseen > 0.0).sum().item()
+            num_base += (is_unseen < 1.0).sum().item()
+            cnt += len(sampled_boxes)
+
+        cnt += 1e-12
+        storage = get_event_storage()
+        storage.put_scalar(f"{name}/background", num_bg / cnt)
+        storage.put_scalar(f"{name}/novel", num_novel / cnt)
+        storage.put_scalar(f"{name}/base", num_base / cnt)
+
     def kd_clip_contrast(self,
                          group_info,
                          predictions, clip_images,
                          clip_model,
                          image_info=None):
+        self.record_class_proportions([g['sampled_instances'] for g in group_info],
+                                      list(image_info.keys()), 'sampled_proportions')
         pseudo_words = predictions.pop('kd_pseudo_words')
         device = pseudo_words.device
         storage = get_event_storage()

@@ -148,11 +148,30 @@ class CustomRes5ROIHeads(Res5ROIHeads):
 
         return proposals_with_gt, group_infos
 
+    @staticmethod
+    def _record_base_gradient(grad):
+        val = grad.norm()
+        storage = get_event_storage()
+        storage.put_scalar("gradients/base", val.cpu().numpy())
+
+    @staticmethod
+    def _record_novel_gradient(grad):
+        val = grad.norm()
+        storage = get_event_storage()
+        storage.put_scalar("gradients/novel", val.cpu().numpy())
+
     def _box_forward_train(self, box_features, proposals):
+        sample_types = torch.cat([p.sample_types for p in proposals], dim=0)
         input_box_features = self.box_predictor.pre_forward(
             box_features.mean(dim=[2, 3]))
+
+        # TODO record gradient
+        base_box_features = input_box_features[sample_types == 0]
+        novel_box_features = input_box_features[sample_types > 0]
+        base_box_features.register_hook(self._record_base_gradient)
+        novel_box_features.register_hook(self._record_novel_gradient)
+
         pseudo_words = self.box_predictor.pred_words(input_box_features)
-        sample_types = torch.cat([p.sample_types for p in proposals], dim=0)
         scores = self.box_predictor.pred_cls_score(pseudo_words[sample_types == 0])
         proposal_deltas = self.box_predictor.bbox_pred(input_box_features[sample_types == 0])
         predictions = dict(kd_pseudo_words=pseudo_words[sample_types == 1],
