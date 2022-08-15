@@ -360,7 +360,8 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         storage.put_scalar("gradients/classification", val.cpu().numpy())
 
     def pred_cls_score(self, pseudo_words, **kwargs):
-        pseudo_words.register_hook(self._record_gradient)
+        if self.training:
+            pseudo_words.register_hook(self._record_gradient)
         clip_model = self.clip
         if pseudo_words.shape[0] == 0:
             return pseudo_words.new_zeros(0, self.num_classes + 1)
