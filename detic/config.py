@@ -208,4 +208,4 @@ def add_detic_config(cfg):
     _C.SAVE_DEBUG_PATH = 'output/save_debug/'
 
     _C.MODEL.RPN.POS_WEIGHT = 1.0
-    _C.SEED = 1000      # fix seed
+    _C.SEED = 59952231      # fix seed
