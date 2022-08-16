@@ -55,7 +55,7 @@ class CustomRes5ROIHeads(Res5ROIHeads):
         del images
         if self.training:
             proposals, group_infos = self.label_and_sample_proposals(
-                proposals, targets, ann_types=ann_types)
+                proposals, targets, ann_types=ann_types, image_ids=list(image_info.keys()))
 
         proposal_boxes = [x.proposal_boxes for x in proposals]
         box_features = self._shared_roi_transform(
@@ -101,7 +101,7 @@ class CustomRes5ROIHeads(Res5ROIHeads):
             return pred_instances, {}
 
     @torch.no_grad()
-    def label_and_sample_proposals(self, proposals, targets, ann_types):
+    def label_and_sample_proposals(self, proposals, targets, ann_types, image_ids):
         if self.proposal_append_gt:
             proposals = add_ground_truth_to_proposals(targets, proposals)
 
@@ -110,7 +110,8 @@ class CustomRes5ROIHeads(Res5ROIHeads):
         num_fg_samples = []
         num_bg_samples = []
         group_infos = []
-        for proposals_per_image, targets_per_image, ann_type in zip(proposals, targets, ann_types):
+        for proposals_per_image, targets_per_image, ann_type, image_id \
+                in zip(proposals, targets, ann_types, image_ids):
             has_gt = len(targets_per_image) > 0
             match_quality_matrix = pairwise_iou(
                 targets_per_image.gt_boxes, proposals_per_image.proposal_boxes
@@ -119,7 +120,7 @@ class CustomRes5ROIHeads(Res5ROIHeads):
             sampled_idxs, gt_classes = self._sample_proposals(
                 matched_idxs, matched_labels, targets_per_image.gt_classes
             )
-            added_instances, group_info = self.context_modeling.sample(proposals_per_image, self.mask_on)
+            added_instances, group_info = self.context_modeling.sample(proposals_per_image, self.mask_on, image_id)
             group_infos.append(group_info)
             # sample type: -1 for topk; 0 for det; 1 for clip-img; 2 for caption
 
@@ -146,30 +147,23 @@ class CustomRes5ROIHeads(Res5ROIHeads):
         storage.put_scalar("roi_head/num_fg_samples", np.mean(num_fg_samples))
         storage.put_scalar("roi_head/num_bg_samples", np.mean(num_bg_samples))
 
+        for k in ['base_scores', 'novel_scores', 'base_ious', 'novel_ious']:
+            values = np.concatenate([g['gt_ious_scores'][k] for g in group_infos], axis=0)
+            if len(values) > 0:
+                val = values.mean()
+            else:
+                if f"gt_ious_scores/{k}" in storage._latest_scalars:
+                    val = storage._latest_scalars[f"gt_ious_scores/{k}"][0]
+                else:
+                    val = np.zeros(1).sum()
+            storage.put_scalar(f"gt_ious_scores/{k}", val)
+
         return proposals_with_gt, group_infos
-
-    @staticmethod
-    def _record_base_gradient(grad):
-        val = grad.norm()
-        storage = get_event_storage()
-        storage.put_scalar("gradients/base", val.cpu().numpy())
-
-    @staticmethod
-    def _record_novel_gradient(grad):
-        val = grad.norm()
-        storage = get_event_storage()
-        storage.put_scalar("gradients/novel", val.cpu().numpy())
 
     def _box_forward_train(self, box_features, proposals):
         sample_types = torch.cat([p.sample_types for p in proposals], dim=0)
         input_box_features = self.box_predictor.pre_forward(
             box_features.mean(dim=[2, 3]))
-
-        # TODO record gradient
-        base_box_features = input_box_features[sample_types == 0]
-        novel_box_features = input_box_features[sample_types > 0]
-        base_box_features.register_hook(self._record_base_gradient)
-        novel_box_features.register_hook(self._record_novel_gradient)
 
         pseudo_words = self.box_predictor.pred_words(input_box_features)
         scores = self.box_predictor.pred_cls_score(pseudo_words[sample_types == 0])

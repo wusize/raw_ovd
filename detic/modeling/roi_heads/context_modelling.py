@@ -339,9 +339,41 @@ class ContextModelling(nn.Module):
         return self._sample_topk_proposals(proposals_per_image, mask_on)
 
     # TODO: input topk proposals
-    def sample(self, proposals_per_image, mask_on=False):
+    def sample(self, proposals_per_image, mask_on=False, image_id=None):
+        if image_id is not None:
+            gt_ious_scores = self.get_topk_average_scores(proposals_per_image, image_id)
+        else:
+            gt_ious_scores = None
         topk_proposals = self._sample_topk_proposals(proposals_per_image, mask_on)
-        return self.sample_on_topk(topk_proposals, mask_on)
+        added_instances, info = self.sample_on_topk(topk_proposals, mask_on)
+        info.update(gt_ious_scores=gt_ious_scores)
+
+        return added_instances, info
+
+    @torch.no_grad()
+    def get_topk_average_scores(self, topk_proposals, image_id):
+        proposal_boxes = topk_proposals.proposal_boxes
+        image_size = topk_proposals.image_size
+        image = self.images[image_id]
+        device = proposal_boxes.device
+        gt_boxes = image['gt_boxes'].to(device)
+        ori_image_size = image['image_size']
+        gt_is_unseen = image['gt_is_unseen'].to(device)
+
+        proposal_boxes.scale(ori_image_size[1] / image_size[1],
+                             ori_image_size[0] / image_size[0])
+
+        ious = box_iou(gt_boxes, proposal_boxes.tensor)
+        mathed_preds = ious > 0.5
+        proposal_scores = topk_proposals.objectness_logits.sigmoid()
+        average_scores_per_gt = (mathed_preds.float() * proposal_scores).sum(-1) / (mathed_preds.sum(-1) + 1e-12)
+        max_ious_per_gt = ious.max(-1).values
+
+        return dict(base_scores=average_scores_per_gt[gt_is_unseen < 1.0].cpu().numpy(),
+                    novel_scores=average_scores_per_gt[gt_is_unseen > 0.0].cpu().numpy(),
+                    base_ious=max_ious_per_gt[gt_is_unseen < 1.0].cpu().numpy(),
+                    novel_ious=max_ious_per_gt[gt_is_unseen > 0.0].cpu().numpy(),
+                    )
 
     def sample_on_topk(self, topk_proposals, mask_on=False):
         checkborad_instances, checkborad_group_info = self._checkboard_sampling(topk_proposals, mask_on)
