@@ -4,6 +4,18 @@ from six.moves import map, zip
 from torchvision.ops import nms
 
 
+@torch.no_grad()
+def scale(tensor, scale_x, scale_y):
+    """
+    Scale the box with horizontal and vertical scaling factors
+    """
+    out = tensor.clone()
+    out[:, 0::2] *= scale_x
+    out[:, 1::2] *= scale_y
+
+    return out
+
+
 def get_potional_indices(mask):
     # note: the mask has considered the start and end token
 

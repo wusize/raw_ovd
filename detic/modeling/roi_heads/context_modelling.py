@@ -6,7 +6,8 @@ import math
 from .stochastic_sampling import StochasticSampling
 from torchvision.ops import roi_align, nms, box_iou
 from .utils import (multi_apply, get_normed_boxes,
-                    bbox_xyxy_to_cxcywh, repeat_crops_and_get_att_mask)
+                    bbox_xyxy_to_cxcywh, repeat_crops_and_get_att_mask,
+                    scale)
 from detectron2.structures import Instances, Boxes
 from .queues import Queues
 from detectron2.utils.events import get_event_storage
@@ -352,7 +353,7 @@ class ContextModelling(nn.Module):
 
     @torch.no_grad()
     def get_topk_average_scores(self, topk_proposals, image_id):
-        proposal_boxes = topk_proposals.proposal_boxes
+        proposal_boxes = topk_proposals.proposal_boxes.tensor
         image_size = topk_proposals.image_size
         image = self.images[image_id]
         device = proposal_boxes.device
@@ -360,10 +361,11 @@ class ContextModelling(nn.Module):
         ori_image_size = image['image_size']
         gt_is_unseen = image['gt_is_unseen'].to(device)
 
-        proposal_boxes.scale(ori_image_size[1] / image_size[1],
-                             ori_image_size[0] / image_size[0])
+        proposal_boxes = scale(proposal_boxes,
+                               ori_image_size[1] / image_size[1],
+                               ori_image_size[0] / image_size[0])
 
-        ious = box_iou(gt_boxes, proposal_boxes.tensor)
+        ious = box_iou(gt_boxes, proposal_boxes)
         mathed_preds = ious > 0.5
         proposal_scores = topk_proposals.objectness_logits.sigmoid()
         average_scores_per_gt = (mathed_preds.float() * proposal_scores).sum(-1) / (mathed_preds.sum(-1) + 1e-12)
@@ -435,13 +437,14 @@ class ContextModelling(nn.Module):
             image_size = inst.image_size
             gt = self.images[img_id]
             gt_image_size = gt['image_size']
-            sampled_boxes = inst.proposal_boxes
-            sampled_boxes.scale(gt_image_size[1] / image_size[1],
-                                gt_image_size[0] / image_size[0])
+            sampled_boxes = inst.proposal_boxes.tensor
+            sampled_boxes = scale(sampled_boxes,
+                                  gt_image_size[1] / image_size[1],
+                                  gt_image_size[0] / image_size[0])
             device = sampled_boxes.device
             gt_boxes = gt['gt_boxes'].to(device)
             gt_is_unseen = gt['gt_is_unseen'].to(device)
-            ious = box_iou(sampled_boxes.tensor, gt_boxes)
+            ious = box_iou(sampled_boxes, gt_boxes)
             ious, matched_gts = ious.max(1)
             is_unseen = gt_is_unseen[matched_gts]
             is_unseen = is_unseen[ious >= thr]
