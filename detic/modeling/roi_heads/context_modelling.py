@@ -143,18 +143,22 @@ class ContextModelling(nn.Module):
             unseen_cat_ids = [cat['id'] for cat in categories_unseen]
         else:
             raise NotImplementedError
+        all_gt_is_unseen = []
         for img_id, anns in gt_coco.imgToAnns.items():
             gt_boxes = torch.tensor([ann['bbox'] for ann in anns])
             gt_boxes[:, 2:] = gt_boxes[:, 2:] + gt_boxes[:, :2]
             # gt_classes = torch.tensor([id_map[ann['category_id']] for ann in anns]).long()
             gt_is_unseen = torch.tensor([1 if ann['category_id'] in unseen_cat_ids else 0
-                                         for ann in anns])
+                                         for ann in anns]).float()
+            all_gt_is_unseen.append(gt_is_unseen)
 
             img_info = gt_coco.imgs[img_id]
             image_size = (img_info['height'], img_info['width'])
 
             images[img_id] = dict(gt_boxes=gt_boxes, gt_is_unseen=gt_is_unseen,
                                   image_size=image_size)
+        unseen_ratio = torch.cat(all_gt_is_unseen).mean()
+        print(f'Ratio of novel boxes: {unseen_ratio}', flush=True)
 
         self.images = images
 
@@ -392,6 +396,7 @@ class ContextModelling(nn.Module):
         num_novel = 0
         num_base = 0
         cnt = 0
+        thr = 0.2
         for img_id, inst in zip(image_ids, sampled_instances):
             if img_id not in self.images:
                 continue
@@ -407,8 +412,8 @@ class ContextModelling(nn.Module):
             ious = box_iou(sampled_boxes.tensor, gt_boxes)
             ious, matched_gts = ious.max(1)
             is_unseen = gt_is_unseen[matched_gts]
-            is_unseen = is_unseen[ious >= 0.5]
-            num_bg += (ious < 0.5).sum().item()
+            is_unseen = is_unseen[ious >= thr]
+            num_bg += (ious < thr).sum().item()
             num_novel += (is_unseen > 0.0).sum().item()
             num_base += (is_unseen < 1.0).sum().item()
             cnt += len(sampled_boxes)
