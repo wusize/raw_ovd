@@ -20,6 +20,9 @@ class ZeroShotClassifier(nn.Module):
     ):
         super().__init__()
         self.norm_temperature = norm_temperature
+        if self.cfg.LEARN_TEMP:
+            self.norm_temperature = nn.Parameter(
+                torch.tensor(self.norm_temperature))
         self.use_bias = use_bias < 0
         if self.use_bias:
             if self.cfg.MODEL.ROI_BOX_HEAD.FIX_BIAS:
@@ -58,6 +61,10 @@ class ZeroShotClassifier(nn.Module):
             x: B x D'
             classifier_info: (C', C' x D)
         '''
+        if self.training and self.cfg.LEARN_TEMP:
+            storage = get_event_storage()
+            storage.put_scalar('temperature/classification',
+                               self.norm_temperature.data.detach().cpu().numpy())
         zs_weight = self.zs_weight
         x = self.norm_temperature * F.normalize(x, p=2, dim=1)
         x = torch.mm(x, zs_weight)

@@ -185,6 +185,10 @@ class ContextModelling(nn.Module):
             self.token_temp = cfg.TOKEN_TEMP  # 50.0
             self.bce_bias = nn.Parameter(torch.tensor(0.0))
 
+            if self.cfg.LEARN_TEMP:
+                self.ce_temp = nn.Parameter(torch.tensor(self.ce_temp))
+                self.token_temp = nn.Parameter(torch.tensor(self.token_temp))
+
             self.queues = Queues(queue_cfg=self.cfg.QUEUE)
             if self.cfg.POSITIONAL_ENCODING:
                 self.positional_embed = SinePositionalEncoding(num_feats=128,
@@ -470,6 +474,12 @@ class ContextModelling(nn.Module):
                          predictions, clip_images,
                          clip_model,
                          image_info=None):
+        if self.cfg.LEARN_TEMP:
+            storage = get_event_storage()
+            storage.put_scalar('temperature/ce',
+                               self.ce_temp.data.detach().cpu().numpy())
+            storage.put_scalar('temperature/token_ce',
+                               self.token_temp.data.detach().cpu().numpy())
         self.record_class_proportions([g['sampled_instances'] for g in group_info],
                                       list(image_info.keys()), 'sampled_proportions')
         pseudo_words = predictions.pop('kd_pseudo_words')

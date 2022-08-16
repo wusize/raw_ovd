@@ -151,10 +151,13 @@ def add_detic_config(cfg):
     _C.MODEL.ROI_BOX_HEAD.IMAGE_LOSS_WEIGHT = 1.0
     _C.MODEL.WITH_IMAGE_LABELS = False  # Turn on co-training with classification data
 
+    _C.LEARN_TEMP = False
+
     # context sampling
     _C.CONTEXT_MODELLING = CN()
     _C.CONTEXT_MODELLING.ENABLE = False
     _C.CONTEXT_MODELLING.NUM_LEVELS = 4
+    _C.CONTEXT_MODELLING.LEARN_TEMP = _C.LEARN_TEMP
     _C.CONTEXT_MODELLING.INSTANCES_PREDICTIONS = ''
     _C.CONTEXT_MODELLING.ALL_GTS = 'datasets/coco/annotations/instances_train2017.json'
     _C.CONTEXT_MODELLING.DATASET = 'COCO'
