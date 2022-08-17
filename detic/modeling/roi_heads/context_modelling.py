@@ -375,7 +375,7 @@ class ContextModelling(nn.Module):
         average_scores_per_gt = (mathed_preds.float() * proposal_scores).sum(-1) / (mathed_preds.sum(-1) + 1e-12)
         max_ious_per_gt = ious.max(-1).values
 
-        bg_preds = ious.max(0).values > 0.5
+        bg_preds = ious.max(0).values < 0.5
         bg_scores = proposal_scores[bg_preds]
         return dict(base_scores=average_scores_per_gt[gt_is_unseen < 1.0].cpu().numpy(),
                     novel_scores=average_scores_per_gt[gt_is_unseen > 0.0].cpu().numpy(),
