@@ -1,5 +1,4 @@
 # Copyright (c) Facebook, Inc. and its affiliates
-from detectron2.structures.instances import Instances
 from detectron2.structures.boxes import Boxes
 import torch
 import numpy as np
@@ -51,7 +50,7 @@ class StandardROIHeadsV2(StandardROIHeads):
         del images
         if self.training:
             proposals, group_infos = self.label_and_sample_proposals(
-                proposals, targets, ann_types=ann_types, image_ids=list(image_info.keys()))
+                proposals, targets, ann_types=ann_types)
             del targets
             losses = self._forward_box(features, proposals, clip_images, image_info,
                                        resized_image_info, group_infos)
