@@ -1,8 +1,7 @@
-# Copyright (c) Facebook, Inc. and its affiliates.
-from .standard_roi_heads import CustomStandardROIHeads
+# Copyright (c) Facebook, Inc. and its affiliates
+from detectron2.structures.instances import Instances
 from detectron2.structures.boxes import Boxes
 import torch
-import torch.nn as nn
 import numpy as np
 from detectron2.config import configurable
 from detectron2.modeling.roi_heads.roi_heads import ROI_HEADS_REGISTRY, StandardROIHeads
@@ -12,19 +11,62 @@ from detectron2.utils.events import get_event_storage
 from detectron2.modeling.proposal_generator.proposal_utils \
     import add_ground_truth_to_proposals
 from detectron2.structures import pairwise_iou
-from detectron2.layers import ShapeSpec
-from detectron2.modeling.roi_heads.fast_rcnn import FastRCNNOutputLayers
-from detectron2.modeling.roi_heads.box_head import build_box_head
-from detectron2.modeling.roi_heads.mask_head import build_mask_head
-from detectron2.modeling.poolers import ROIPooler
-from typing import List
-from detic.modeling.roi_heads.context_modelling import ContextModelling
+from .levelwise_context_modelling import LevelWiseContextModelling as ContextModelling
 from time import time
-from detectron2.modeling.poolers import convert_boxes_to_pooler_format
 
 
 @ROI_HEADS_REGISTRY.register()
-class StandardROIHeadsV2(CustomStandardROIHeads):
+class StandardROIHeadsV2(StandardROIHeads):
+    @configurable
+    def __init__(self, **kwargs):
+        cfg = kwargs.pop('cfg')
+        super().__init__(**kwargs)
+        self.ws_num_props = cfg.MODEL.ROI_BOX_HEAD.WS_NUM_PROPS
+        self.image_box_size = cfg.MODEL.ROI_BOX_HEAD.IMAGE_BOX_SIZE
+        self.box_predictor = DeticFastRCNNOutputLayers(
+            cfg,  self.box_head.output_shape
+        )
+
+        self.context_modeling_cfg = cfg.CONTEXT_MODELLING
+        self.cfg = cfg
+
+        self.context_modeling = ContextModelling(self.context_modeling_cfg,
+                                                 num_words=self.box_predictor.num_words,
+                                                 word_embed_dim=self.box_predictor.word_embed_dim,
+                                                 word_dropout=self.box_predictor.word_dropout)
+
+    @classmethod
+    def from_config(cls, cfg, input_shape):
+        ret = super().from_config(cfg, input_shape)
+        ret['cfg'] = cfg
+        return ret
+
+    def forward(self, images, features, proposals, targets=None,
+                ann_types=None, clip_images=None, image_info=None,
+                resized_image_info=None):
+        '''
+        enable debug and image labels
+        '''
+
+        del images
+        if self.training:
+            proposals, group_infos = self.label_and_sample_proposals(
+                proposals, targets, ann_types=ann_types, image_ids=list(image_info.keys()))
+            del targets
+            losses = self._forward_box(features, proposals, clip_images, image_info,
+                                       resized_image_info, group_infos)
+            # Usually the original proposals used by the box head are used by the mask, keypoint
+            # heads. But when `self.train_on_pred_boxes is True`, proposals will contain boxes
+            # predicted by the box head.
+            losses.update(self._forward_mask(features, proposals))
+            losses.update(self._forward_keypoint(features, proposals))
+            return proposals, losses
+        else:
+            pred_instances = self._forward_box(features, proposals)
+            # During inference cascaded prediction is used: the mask and keypoints heads are only
+            # applied to the top scoring box detections.
+            pred_instances = self.forward_with_given_boxes(features, pred_instances)
+            return pred_instances, {}
 
     def _forward_box(self, features, proposals,
                      clip_images=None, image_info=None,

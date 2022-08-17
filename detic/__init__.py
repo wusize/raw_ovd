@@ -1,7 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 from .modeling.meta_arch import custom_rcnn
 from .modeling.roi_heads import detic_roi_heads
-from .modeling.roi_heads import (res5_roi_heads, standard_roi_heads, multilevel_roi_heads,
+from .modeling.roi_heads import (res5_roi_heads, standard_roi_heads, multilevel_roi_heads, standard_roi_heads2,
                                  fpn_res5_roi_heads, fpn_res5_cat_roi_heads, offline_standard_roi_heads)
 from .modeling.roi_heads.standard_roi_heads import FPNSumStandardROIHeads
 from .modeling.backbone import swintransformer

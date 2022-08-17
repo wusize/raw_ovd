@@ -1,20 +1,12 @@
-import random
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-import math
-from .stochastic_sampling import StochasticSampling
-from torchvision.ops import roi_align, nms
-from .utils import (multi_apply, get_normed_boxes,
-                    bbox_xyxy_to_cxcywh, repeat_crops_and_get_att_mask)
-from detectron2.structures import Instances, Boxes
-from .queues import Queues
+from torchvision.ops import roi_align
+from .utils import (multi_apply,
+                    bbox_xyxy_to_cxcywh)
 from detectron2.utils.events import get_event_storage
 import numpy as np
 from time import time
 from torch.cuda.amp import autocast
-from detic.modeling import clip as CLIP
-from detectron2.structures.masks import PolygonMasks
 from .context_modelling import ContextModelling, process_single_image_groups
 from detectron2.modeling.poolers import convert_boxes_to_pooler_format
 
@@ -38,24 +30,6 @@ class LevelWiseContextModelling(ContextModelling):
             multilevel_pseudo_words.append(pseudo_words)
 
         return torch.stack(multilevel_pseudo_words, dim=0)
-
-    def _get_single_level_text_features(self, pseudo_words, preds_split_by_perms, clip_model):
-        word_masks = self._drop_word(pseudo_words)
-        word_sequences = pseudo_words.split(preds_split_by_perms, dim=0)
-        word_masks = word_masks.split(preds_split_by_perms, dim=0)
-        word_sequences = [seq.flatten(0, 1)[wm.flatten(0, 1)] for seq, wm in zip(word_sequences, word_masks)]
-        context_length = max([seq.shape[0] for seq in word_sequences])
-        clip_model.eval()
-        with autocast():
-            # TODO: get local image tokens
-            pseudo_text, end_token_ids = clip_model.prepare_pseudo_text(
-                word_sequences,
-                context_length=context_length + 2)  # add start and stop token
-            clip_text_features, clip_word_tokens = \
-                clip_model.encode_pseudo_text(pseudo_text, end_token_ids,
-                                              text_pe=True, normalize=True,
-                                              return_word_tokens=True)
-        return clip_text_features.float(), clip_word_tokens.float()
 
     def kd_clip_contrast(self,
                          group_infos, clip_images, image_info, features, roi_head):
@@ -92,8 +66,7 @@ class LevelWiseContextModelling(ContextModelling):
         # torch.cat(normed_boxes).split(preds_split_by_perms, dim=0)
         preds_split_by_perms = [p for b in preds_split_by_perms for p in b]
 
-        # get multilevel feautures
-
+        # TODO: get multilevel feautures
         num_levels = pseudo_words.shape[0]
         pseudo_words = pseudo_words.flatten(0, 1)
         multilevel_preds_split_by_perms = preds_split_by_perms * num_levels
@@ -125,16 +98,15 @@ class LevelWiseContextModelling(ContextModelling):
                            np.float32(tik-tok))
         global_clip_image_features = self.queues.get_queue('clip_image_features')
         global_clip_text_features = self.queues.get_queue('clip_text_features')
-        num_queries = clip_text_features.shape[0]
-        assert clip_image_features.shape[0] * num_levels == num_queries
-        label_mask = seq_ids[None] == [seq_ids[:, None]]
+        assert clip_image_features.shape[0] * num_levels == clip_text_features.shape[0]
+        label_mask = seq_ids[None] == seq_ids[:, None]
         label_mask.fill_diagonal_(False)        # before replicate
         # mask same synced_img
         global_text_feature_img_ids = global_clip_text_features[..., -1]
         global_image_feature_img_ids = global_clip_image_features[..., -1]
 
         # text features as queries
-        num_keys = num_queries // num_levels
+        num_keys = clip_image_features.shape[0]
         image_keys = torch.cat([clip_image_features, global_clip_image_features[..., :-1]], dim=0)
         similarity_matrix_0 = self.ce_temp * clip_text_features @ image_keys.T
         similarity_matrix_0[:, :num_keys][label_mask.repeat(num_levels, 1)] = float('-inf')
@@ -147,19 +119,21 @@ class LevelWiseContextModelling(ContextModelling):
 
         # image features as queries
         text_keys = torch.cat([clip_text_features, global_clip_text_features[..., :-1]], dim=0)
+        num_keys = clip_text_features.shape[0]
         similarity_matrix_1 = self.ce_temp * clip_image_features @ text_keys.T
-        similarity_matrix_1[:, :num_queries][label_mask.repeat(1, num_levels)] = float('-inf')
+        similarity_matrix_1[:, :num_keys][label_mask.repeat(1, num_levels)] = float('-inf')
         if global_text_feature_img_ids.shape[0] > 0:
             img_id_mask_1 = img_ids[:, None] == global_text_feature_img_ids[None]
-            if similarity_matrix_1[:, num_queries:].shape != img_id_mask_1.shape:   # TODO: fix it
+            if similarity_matrix_1[:, num_keys:].shape != img_id_mask_1.shape:   # TODO: fix it
                 print(f'bug emerges: {similarity_matrix_1.shape}, {img_id_mask_1.shape}', flush=True)
                 return self.kd_jump_over_error(pseudo_words, {}, {})
-            similarity_matrix_1[:, num_queries:][img_id_mask_1] = float('-inf')
+            similarity_matrix_1[:, num_keys:][img_id_mask_1] = float('-inf')
 
-        label = torch.arange(num_queries).to(device)
+        label_0 = torch.arange(clip_text_features.shape[0]).to(device)
+        label_1 = torch.arange(clip_image_features.shape[0]).to(device)
 
-        loss = 0.5 * F.cross_entropy(similarity_matrix_0, label) \
-               + 0.5 * F.cross_entropy(similarity_matrix_1, label)
+        loss = 0.5 * F.cross_entropy(similarity_matrix_0, label_0) \
+               + 0.5 * F.cross_entropy(similarity_matrix_1, label_1)
         losses = dict(contrast_loss=loss * self.cfg.CONTRAST_LOSS_WEIGHT)
         # Enqueue
         queues_update = dict(clip_text_features=torch.cat([clip_text_features,
@@ -167,7 +141,7 @@ class LevelWiseContextModelling(ContextModelling):
                              clip_image_features=torch.cat([clip_image_features,
                                                             img_ids.view(-1, 1)], dim=-1).detach()
                              )
-
+        # todo multi-level supervision at the word level
         if self.checkboard_cfg.LOCAL_CORRESPONDENCE:
             tik = time()
             preds_split_by_batch = [n.shape[0] for n in normed_boxes]
@@ -209,36 +183,41 @@ class LevelWiseContextModelling(ContextModelling):
             global_word_feature_img_ids = global_clip_word_features[..., -1]
             global_patch_feature_img_ids = global_clip_patch_features[..., -1]
 
-            num_queries = clip_patch_features.shape[0]
-            assert num_queries == clip_word_features.shape[0]
+            assert clip_patch_features.shape[0] * num_levels == clip_word_features.shape[0]
 
             # text features as queries
             image_keys = torch.cat([clip_patch_features, global_clip_patch_features[..., :-1]])
+            num_keys = clip_patch_features.shape[0]
             similarity_matrix_0 = self.token_temp * clip_word_features @ image_keys.T
             if global_patch_feature_img_ids.shape[0] > 0:
-                img_id_mask_0 = img_ids[:, None] == global_patch_feature_img_ids[None]
-                if similarity_matrix_0[:, num_queries:].shape != img_id_mask_0.shape:  # TODO: fix it
+                img_id_mask_0 = img_ids[:, None].repeat(num_levels, 1) == global_patch_feature_img_ids[None]
+                if similarity_matrix_0[:, num_keys:].shape != img_id_mask_0.shape:  # TODO: fix it
                     print(f'bug emerges: {similarity_matrix_0.shape}, {img_id_mask_0.shape}', flush=True)
                     return self.kd_jump_over_error(pseudo_words, losses, queues_update)
-                similarity_matrix_0[:, num_queries:][img_id_mask_0] = float('-inf')
+                similarity_matrix_0[:, num_keys:][img_id_mask_0] = float('-inf')
             # image features as queries
             text_keys = torch.cat([clip_word_features, global_clip_word_features[..., :-1]])
+            num_keys = clip_word_features.shape[0]
             similarity_matrix_1 = self.token_temp * clip_patch_features @ text_keys.T
             if global_word_feature_img_ids.shape[0] > 0:
                 img_id_mask_1 = img_ids[:, None] == global_word_feature_img_ids[None]
-                if similarity_matrix_1[:, num_queries:].shape != img_id_mask_1.shape:  # TODO: fix it
+                if similarity_matrix_1[:, num_keys:].shape != img_id_mask_1.shape:  # TODO: fix it
                     print(f'bug emerges: {similarity_matrix_1.shape}, {img_id_mask_1.shape}', flush=True)
                     return self.kd_jump_over_error(pseudo_words, losses, queues_update)
-                similarity_matrix_1[:, num_queries:][img_id_mask_1] = float('-inf')
-            labels = torch.arange(num_queries, device=device)
+                similarity_matrix_1[:, num_keys:][img_id_mask_1] = float('-inf')
+            labels_0 = torch.arange(clip_word_features.shape[0], device=device)
+            labels_1 = torch.arange(clip_patch_features.shape[0], device=device)
+
             label_mask = box_ids[None] == box_ids[:, None]
             label_mask.fill_diagonal_(False)
 
-            similarity_matrix_0[:, :num_queries][label_mask] = float('-inf')
-            similarity_matrix_1[:, :num_queries][label_mask] = float('-inf')
+            similarity_matrix_0[:, :clip_patch_features.shape[0]][
+                label_mask.repeat(num_levels, 1)] = float('-inf')
+            similarity_matrix_1[:, :clip_word_features.shape[0]][
+                label_mask.repeat(1, num_levels)] = float('-inf')
 
-            loss = F.cross_entropy(similarity_matrix_0, labels) * 0.5 \
-                   + F.cross_entropy(similarity_matrix_1, labels) * 0.5
+            loss = F.cross_entropy(similarity_matrix_0, labels_0) * 0.5 \
+                   + F.cross_entropy(similarity_matrix_1, labels_1) * 0.5
             losses.update(token_loss=loss * self.cfg.TOKEN_LOSS_WEIGHT)
 
             queues_update.update(clip_word_features=torch.cat([clip_word_features,
