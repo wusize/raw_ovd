@@ -437,6 +437,8 @@ class ContextModelling(nn.Module):
         num_base = 0
         cnt = 0
         thr = 0.2
+        ious_with_base_list = []
+        ious_with_novel_list = []
         for img_id, inst in zip(image_ids, sampled_instances):
             if img_id not in self.images:
                 continue
@@ -451,6 +453,12 @@ class ContextModelling(nn.Module):
             gt_boxes = gt['gt_boxes'].to(device)
             gt_is_unseen = gt['gt_is_unseen'].to(device)
             ious = box_iou(sampled_boxes, gt_boxes)
+            ious_with_novel = ious[:, gt_is_unseen]
+            ious_with_base = ious[:, gt_is_unseen.logical_not()]
+            ious_with_novel_list.append(
+                ious_with_novel.sum(-1) / (ious_with_novel.shape[-1] + 1e-12))
+            ious_with_base_list.append(
+                ious_with_base.sum(-1) / (ious_with_base.shape[-1] + 1e-12))
             ious, matched_gts = ious.max(1)
             is_unseen = gt_is_unseen[matched_gts]
             is_unseen = is_unseen[ious >= thr]
@@ -464,6 +472,10 @@ class ContextModelling(nn.Module):
         storage.put_scalar(f"{name}/background", np.float32(num_bg / cnt))
         storage.put_scalar(f"{name}/novel", np.float32(num_novel / cnt))
         storage.put_scalar(f"{name}/base", np.float32(num_base / cnt))
+        ious_with_base = torch.cat(ious_with_base_list).mean().cpu().numpy()
+        ious_with_novel = torch.cat(ious_with_novel_list).mean().cpu().numpy()
+        storage.put_scalar(f"{name}/ious_with_novel", ious_with_novel)
+        storage.put_scalar(f"{name}/ious_with_base", ious_with_base)
 
     @staticmethod
     def _record_gradient(grad):
