@@ -145,6 +145,7 @@ class LevelWiseContextModelling(ContextModelling):
                              )
         # todo multi-level supervision at the word level
         if self.checkboard_cfg.LOCAL_CORRESPONDENCE:
+            import pdb; pdb.set_trace()
             tik = time()
             preds_split_by_batch = [n.shape[0] for n in normed_boxes]
             img_ids = [torch.tensor(b * [img_id])
