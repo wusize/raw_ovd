@@ -25,7 +25,10 @@ class LevelWiseContextModelling(ContextModelling):
                 [F.interpolate(x_, size=target_shape,
                                mode="bilinear",
                                align_corners=False) for x_ in features], dim=0)  # stack at dim 0
-            resized_x = resized_x.sum(0)
+            if self.cfg.MERGE_METHOD == 'max':
+                resized_x = resized_x.max(0).values
+            else:
+                resized_x = resized_x.mean(0)
             box_features = roi_head.box_pooler.level_poolers[1](resized_x, rois)
             box_features = roi_head.box_head(box_features)
             input_box_features = roi_head.box_predictor.pre_forward(box_features)
