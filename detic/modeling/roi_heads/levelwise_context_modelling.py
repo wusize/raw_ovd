@@ -13,21 +13,33 @@ from detectron2.modeling.poolers import convert_boxes_to_pooler_format
 
 class LevelWiseContextModelling(ContextModelling):
 
-    @staticmethod
-    def get_multilevel_pseudo_words(instances, features, roi_head):
+    def get_multilevel_pseudo_words(self, instances, features, roi_head):
         num_levels = len(roi_head.box_pooler.level_poolers)
         multilevel_pseudo_words = []
         rois = convert_boxes_to_pooler_format(
                     [x.proposal_boxes[x.sample_types == 1] for x in instances]
                 )
-        for i in range(num_levels):
-            box_features = roi_head.box_pooler.level_poolers[i](
-                features[i], rois
-            )
+        if self.cfg.MERGE_MULTILEVEL:
+            target_shape = features[1].shape[2:]  # resize to level2  1/8
+            resized_x = torch.stack(
+                [F.interpolate(x_, size=target_shape,
+                               mode="bilinear",
+                               align_corners=False) for x_ in features], dim=0)  # stack at dim 0
+            resized_x = resized_x.sum(0)
+            box_features = roi_head.box_predictor.level_poolers[1](resized_x, rois)
             box_features = roi_head.box_head(box_features)
             input_box_features = roi_head.box_predictor.pre_forward(box_features)
             pseudo_words = roi_head.box_predictor.pred_words(input_box_features)
             multilevel_pseudo_words.append(pseudo_words)
+        else:
+            for i in range(num_levels):
+                box_features = roi_head.box_pooler.level_poolers[i](
+                    features[i], rois
+                )
+                box_features = roi_head.box_head(box_features)
+                input_box_features = roi_head.box_predictor.pre_forward(box_features)
+                pseudo_words = roi_head.box_predictor.pred_words(input_box_features)
+                multilevel_pseudo_words.append(pseudo_words)
 
         return torch.stack(multilevel_pseudo_words, dim=0)
 
