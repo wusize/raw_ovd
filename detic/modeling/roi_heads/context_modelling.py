@@ -453,8 +453,8 @@ class ContextModelling(nn.Module):
             gt_boxes = gt['gt_boxes'].to(device)
             gt_is_unseen = gt['gt_is_unseen'].to(device)
             ious = box_iou(sampled_boxes, gt_boxes)
-            ious_with_novel = ious[:, gt_is_unseen]
-            ious_with_base = ious[:, gt_is_unseen.logical_not()]
+            ious_with_novel = ious[:, gt_is_unseen > 0.0]
+            ious_with_base = ious[:, gt_is_unseen < 1.0]
             ious_with_novel_list.append(
                 ious_with_novel.sum(-1) / (ious_with_novel.shape[-1] + 1e-12))
             ious_with_base_list.append(
