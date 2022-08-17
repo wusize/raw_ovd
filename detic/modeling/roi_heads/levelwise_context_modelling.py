@@ -20,7 +20,7 @@ class LevelWiseContextModelling(ContextModelling):
         rois = convert_boxes_to_pooler_format(
                     [x.proposal_boxes[x.sample_types == 1] for x in instances]
                 )
-        for i in range(num_levels):
+        for i in range(2):
             box_features = roi_head.box_pooler.level_poolers[i](
                 features[i], rois
             )
