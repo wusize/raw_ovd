@@ -375,11 +375,13 @@ class ContextModelling(nn.Module):
         average_scores_per_gt = (mathed_preds.float() * proposal_scores).sum(-1) / (mathed_preds.sum(-1) + 1e-12)
         max_ious_per_gt = ious.max(-1).values
 
+        bg_preds = ious.max(0).values > 0.5
+        bg_scores = proposal_scores[bg_preds]
         return dict(base_scores=average_scores_per_gt[gt_is_unseen < 1.0].cpu().numpy(),
                     novel_scores=average_scores_per_gt[gt_is_unseen > 0.0].cpu().numpy(),
                     base_ious=max_ious_per_gt[gt_is_unseen < 1.0].cpu().numpy(),
                     novel_ious=max_ious_per_gt[gt_is_unseen > 0.0].cpu().numpy(),
-                    )
+                    bg_scores=bg_scores.cpu().numpy())
 
     def sample_on_topk(self, topk_proposals, mask_on=False):
         checkborad_instances, checkborad_group_info = self._checkboard_sampling(topk_proposals, mask_on)
