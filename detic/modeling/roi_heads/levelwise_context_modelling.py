@@ -15,6 +15,7 @@ class LevelWiseContextModelling(ContextModelling):
 
     @staticmethod
     def get_multilevel_pseudo_words(instances, features, roi_head):
+        import pdb; pdb.set_trace()
         num_levels = len(roi_head.box_pooler.level_poolers)
         multilevel_pseudo_words = []
         rois = convert_boxes_to_pooler_format(
