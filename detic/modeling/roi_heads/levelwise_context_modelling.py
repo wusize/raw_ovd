@@ -20,7 +20,7 @@ class LevelWiseContextModelling(ContextModelling):
         rois = convert_boxes_to_pooler_format(
                     [x.proposal_boxes[x.sample_types == 1] for x in instances]
                 )
-        for i in range(2):
+        for i in range(num_levels):
             box_features = roi_head.box_pooler.level_poolers[i](
                 features[i], rois
             )
@@ -138,7 +138,8 @@ class LevelWiseContextModelling(ContextModelling):
         losses = dict(contrast_loss=loss * self.cfg.CONTRAST_LOSS_WEIGHT)
         # Enqueue
         queues_update = dict(clip_text_features=torch.cat([clip_text_features,
-                                                           img_ids.view(-1, 1)], dim=-1).detach(),
+                                                           img_ids.view(-1, 1).repeat(num_levels, 1)],
+                                                          dim=-1).detach(),
                              clip_image_features=torch.cat([clip_image_features,
                                                             img_ids.view(-1, 1)], dim=-1).detach()
                              )
@@ -222,7 +223,8 @@ class LevelWiseContextModelling(ContextModelling):
             losses.update(token_loss=loss * self.cfg.TOKEN_LOSS_WEIGHT)
 
             queues_update.update(clip_word_features=torch.cat([clip_word_features,
-                                                               img_ids.view(-1, 1)], dim=-1).detach(),
+                                                               img_ids.view(-1, 1).repeat(num_levels, 1)],
+                                                              dim=-1).detach(),
                                  clip_patch_features=torch.cat([clip_patch_features,
                                                                 img_ids.view(-1, 1)], dim=-1).detach())
         return losses, queues_update
