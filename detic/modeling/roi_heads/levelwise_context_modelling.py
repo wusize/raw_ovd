@@ -187,7 +187,7 @@ class LevelWiseContextModelling(ContextModelling):
             global_word_feature_img_ids = global_clip_word_features[..., -1]
             global_patch_feature_img_ids = global_clip_patch_features[..., -1]
 
-            assert clip_patch_features.shape[0] * num_levels == clip_word_features.shape[0]
+            assert clip_patch_features.shape[0] == clip_word_features.shape[0]
             num_queries = clip_patch_features.shape[0]
             # text features as queries
             image_keys = torch.cat([clip_patch_features, global_clip_patch_features[..., :-1]])
