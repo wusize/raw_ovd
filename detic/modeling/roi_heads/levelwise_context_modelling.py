@@ -50,7 +50,8 @@ class LevelWiseContextModelling(ContextModelling):
         pseudo_words = pseudo_words + position_embeddings[None]
         start_id = 0
         seq_ids = []
-        for g in group_infos:
+        group_infos_ = [g['checkborad_group_info'] for g in group_infos]
+        for g in group_infos_:
             seq_ids_ = g['seq_ids']
             for seq_id in seq_ids_:
                 seq_ids.append(seq_id + start_id)
@@ -165,7 +166,7 @@ class LevelWiseContextModelling(ContextModelling):
 
             start_id = 0
             box_ids = []
-            for g in group_infos:
+            for g in group_infos_:
                 for ori in g['box_ids']:
                     box_ids_per_ori = [torch.tensor(perm, dtype=torch.float32)
                                        for perm in ori]   # avoid overflow
