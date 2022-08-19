@@ -1,7 +1,6 @@
 _BASE_: "../Base_OVCOCO_FPN_1x.yaml"
 MODEL:
   ROI_BOX_HEAD:
-    NAME: "CustomFastRCNNConvFCHead"
     FC_DIM: 2048
     RANDOM_DROPOUT: 0.5
     NORM_TEMP: 25.0
