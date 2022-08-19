@@ -159,7 +159,7 @@ def add_detic_config(cfg):
     _C.CONTEXT_MODELLING.NUM_LEVELS = 4
     _C.CONTEXT_MODELLING.LEARN_TEMP = _C.LEARN_TEMP
     _C.CONTEXT_MODELLING.INSTANCES_PREDICTIONS = ''
-    _C.CONTEXT_MODELLING.ALL_GTS = 'datasets/coco/annotations/instances_val2017.json'
+    _C.CONTEXT_MODELLING.ALL_GTS = 'datasets/coco/annotations/instances_train2017.json'
     _C.CONTEXT_MODELLING.DATASET = 'COCO'
     _C.CONTEXT_MODELLING.WEIGHTS_PER_LEVEL = [1.0, 1.0, 1.0, 1.0]
     _C.CONTEXT_MODELLING.MERGE_MULTILEVEL = False
