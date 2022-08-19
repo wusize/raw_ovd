@@ -26,7 +26,6 @@ from detectron2.evaluation import (
 )
 from detectron2.modeling import build_model
 from detectron2.solver import build_optimizer
-from detic.custom_solver import build_lr_scheduler
 from detectron2.utils.events import (
     CommonMetricPrinter,
     EventStorage,
@@ -50,7 +49,7 @@ from detic.custom_solver import build_custom_optimizer
 from detic.evaluation.oideval import OIDEvaluator
 from detic.evaluation.custom_coco_eval import CustomCOCOEvaluator
 from detic.modeling.utils import reset_cls_test
-
+from detic.custom_solver import build_lr_scheduler
 
 logger = logging.getLogger("detectron2")
 
