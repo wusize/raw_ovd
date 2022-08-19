@@ -1,5 +1,4 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
-from detectron2.structures.instances import Instances
 from detectron2.structures.boxes import Boxes
 import torch
 import numpy as np
@@ -17,9 +16,21 @@ from detectron2.modeling.roi_heads.box_head import build_box_head
 from detectron2.modeling.roi_heads.mask_head import build_mask_head
 from detectron2.modeling.poolers import ROIPooler
 from typing import List
-from detic.modeling.roi_heads.context_modelling import ContextModelling
+from .disentangle_context_modelling import ContextModellingV2 as ContextModelling
 from time import time
 from detectron2.modeling.poolers import convert_boxes_to_pooler_format
+from torch.autograd.function import Function
+
+
+class _ScaleGradient(Function):
+    @staticmethod
+    def forward(ctx, input, scale):
+        ctx.scale = scale
+        return input
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        return grad_output * ctx.scale, None
 
 
 @ROI_HEADS_REGISTRY.register()
@@ -51,8 +62,14 @@ class CustomStandardROIHeads(StandardROIHeads):
     def _forward_box(self, features, proposals,
                      clip_images=None, image_info=None,
                      resized_image_info=None, group_infos=None):
+        def _record_gradient(grad):
+            val = grad.norm()
+            storage = get_event_storage()
+            storage.put_scalar("gradients/detection", val.cpu().numpy())
         features = [features[f] for f in self.box_in_features]
         box_features = self.box_pooler(features, [x.proposal_boxes for x in proposals])
+        if self.training:
+            box_features.register_hook(_record_gradient)
         box_features = self.box_head(box_features)
 
         if self.training:
@@ -69,8 +86,10 @@ class CustomStandardROIHeads(StandardROIHeads):
             # TODO contrastive learning
             if self.context_modeling_cfg.ENABLE:
                 losses.update(self.context_modeling.get_loss(group_infos,
-                                                             predictions, clip_images,
-                                                             self.box_predictor.clip, image_info))
+                                                             clip_images,
+                                                             self.box_predictor.clip, image_info,
+                                                             self,
+                                                             features))
                 storage.put_scalar("time/contrast_learning", np.float32(time() - tok))
 
             if self.cfg.MODEL.WITH_IMAGE_LABELS:
@@ -141,7 +160,8 @@ class CustomStandardROIHeads(StandardROIHeads):
             sampled_idxs, gt_classes = self._sample_proposals(
                 matched_idxs, matched_labels, targets_per_image.gt_classes
             )
-            added_instances, group_info = self.context_modeling.sample(proposals_per_image, self.mask_on, image_id)
+            sampled_instances, group_info = self.context_modeling.sample(proposals_per_image, self.mask_on, image_id)
+            group_info['sampled_instances'] = sampled_instances
             group_infos.append(group_info)
             # sample type: -1 for topk; 0 for det; 1 for clip-img; 2 for caption
 
@@ -158,7 +178,6 @@ class CustomStandardROIHeads(StandardROIHeads):
                                     torch.zeros_like(proposals_per_image.gt_classes).int())
             if ann_type == 'only_caption':
                 proposals_per_image = proposals_per_image[:0]
-            proposals_per_image = Instances.cat([proposals_per_image, added_instances])
             num_bg_samples.append((gt_classes == self.num_classes).sum().item())
             num_fg_samples.append(gt_classes.numel() - num_bg_samples[-1])
             proposals_with_gt.append(proposals_per_image)
@@ -187,16 +206,29 @@ class CustomStandardROIHeads(StandardROIHeads):
         del box_features
 
         pseudo_words = self.box_predictor.pred_words(input_box_features)
-        storage = get_event_storage()
-        tik = time()
         scores = self.box_predictor.pred_cls_score(pseudo_words[sample_types == 0])
-        storage.put_scalar('time/pred_cls', time() - tik)
         proposal_deltas = self.box_predictor.bbox_pred(input_box_features[sample_types == 0])
         del input_box_features
-        predictions = dict(kd_pseudo_words=pseudo_words[sample_types == 1],
-                           caption_pseudo_words=pseudo_words[sample_types == 2],
-                           scores=scores,
+        predictions = dict(scores=scores,
                            proposal_deltas=proposal_deltas)
+
+        return predictions
+
+    def get_pseudo_words(self, sampled_instances, features):
+        def _record_gradient(grad):
+            val = grad.norm()
+            storage = get_event_storage()
+            storage.put_scalar("gradients/contrastive", val.cpu().numpy())
+        box_features = self.box_pooler(features, [x.proposal_boxes for x in sampled_instances])
+        # TODO: reweight the gradients from contrastive loss
+        box_features = _ScaleGradient.apply(box_features, self.context_modeling_cfg.GRAD_WEIGHT)
+        box_features.register_hook(_record_gradient)
+        box_features = self.box_head(box_features)
+        sample_types = torch.cat([p.sample_types for p in sampled_instances], dim=0)
+        input_box_features = self.box_predictor.pre_forward(box_features)
+        pseudo_words = self.box_predictor.pred_words(input_box_features)
+        predictions = dict(kd_pseudo_words=pseudo_words[sample_types == 1],
+                           caption_pseudo_words=pseudo_words[sample_types == 2])
 
         return predictions
 

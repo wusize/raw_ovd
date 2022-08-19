@@ -1,17 +1,16 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
-from detectron2.structures.instances import Instances
 import torch
 import numpy as np
 from detectron2.config import configurable
-from detectron2.layers import ShapeSpec, get_norm
-from detectron2.modeling.roi_heads.roi_heads import ROI_HEADS_REGISTRY, Res5ROIHeads, select_foreground_proposals
+from detectron2.layers import ShapeSpec
+from detectron2.modeling.roi_heads.roi_heads import ROI_HEADS_REGISTRY, Res5ROIHeads
 from .detic_fast_rcnn import DeticFastRCNNOutputLayers
 from torch.nn import functional as F
 from detectron2.utils.events import get_event_storage
 from detectron2.modeling.proposal_generator.proposal_utils \
     import add_ground_truth_to_proposals
 from detectron2.structures import pairwise_iou
-from detic.modeling.roi_heads.context_modelling import ContextModelling
+from .disentangle_context_modelling import ContextModellingV2 as ContextModelling
 from time import time
 
 
@@ -69,7 +68,6 @@ class CustomRes5ROIHeads(Res5ROIHeads):
                 p.feat = feat
 
         if self.training:
-            del features
             storage = get_event_storage()
             tik = time()
             predictions = self._box_forward_train(box_features, proposals)
@@ -82,10 +80,12 @@ class CustomRes5ROIHeads(Res5ROIHeads):
             # TODO contrastive learning
             if self.context_modeling_cfg.ENABLE:
                 losses.update(self.context_modeling.get_loss(group_infos,
-                                                             predictions, clip_images,
-                                                             self.box_predictor.clip, image_info))
+                                                             clip_images,
+                                                             self.box_predictor.clip, image_info,
+                                                             self,
+                                                             features))
                 storage.put_scalar("time/contrast_learning", np.float32(time() - tok))
-
+            del features
             if self.cfg.MODEL.WITH_IMAGE_LABELS:
                 loss = self.image_label_loss(resized_image_info)
                 if loss is None:
@@ -120,7 +120,8 @@ class CustomRes5ROIHeads(Res5ROIHeads):
             sampled_idxs, gt_classes = self._sample_proposals(
                 matched_idxs, matched_labels, targets_per_image.gt_classes
             )
-            added_instances, group_info = self.context_modeling.sample(proposals_per_image, self.mask_on, image_id)
+            sampled_instances, group_info = self.context_modeling.sample(proposals_per_image, self.mask_on, image_id)
+            group_info['sampled_instances'] = sampled_instances
             group_infos.append(group_info)
             # sample type: -1 for topk; 0 for det; 1 for clip-img; 2 for caption
 
@@ -137,7 +138,6 @@ class CustomRes5ROIHeads(Res5ROIHeads):
                                     torch.zeros_like(proposals_per_image.gt_classes).int())
             if ann_type == 'only_caption':
                 proposals_per_image = proposals_per_image[:0]
-            proposals_per_image = Instances.cat([proposals_per_image, added_instances])
             num_bg_samples.append((gt_classes == self.num_classes).sum().item())
             num_fg_samples.append(gt_classes.numel() - num_bg_samples[-1])
             proposals_with_gt.append(proposals_per_image)
@@ -211,74 +211,17 @@ class CustomRes5ROIHeads(Res5ROIHeads):
 
         return loss * self.cfg.MODEL.ROI_BOX_HEAD.IMAGE_LOSS_WEIGHT
 
-
-@ROI_HEADS_REGISTRY.register()
-class CustomRes5ROIHeadsExtraNorm(CustomRes5ROIHeads):
-    def _build_res5_block(self, cfg):
-        seq, out_channels = super()._build_res5_block(cfg)
-        norm = cfg.MODEL.RESNETS.NORM
-        norm = get_norm(norm, out_channels)
-        seq.add_module("norm", norm)
-        return seq, out_channels
-
-    def forward(self, images, features, proposals, targets=None,
-                ann_types=None, clip_images=None, image_info=None,
-                resized_image_info=None):
-        '''
-        enable debug and image labels
-        '''
-        del images
-        if self.training:
-            proposals, group_infos = self.label_and_sample_proposals(
-                proposals, targets, ann_types=ann_types)
-
-        proposal_boxes = [x.proposal_boxes for x in proposals]
+    def get_pseudo_words(self, sampled_instances, features):
+        proposal_boxes = [x.proposal_boxes for x in sampled_instances]
         box_features = self._shared_roi_transform(
             [features[f] for f in self.in_features], proposal_boxes
         )
+        sample_types = torch.cat([p.sample_types for p in sampled_instances], dim=0)
+        input_box_features = self.box_predictor.pre_forward(
+            box_features.mean(dim=[2, 3]))
 
-        if self.training:
-            del features
-            storage = get_event_storage()
-            tik = time()
-            predictions = self._box_forward_train(box_features, proposals)
-            losses = self.box_predictor.losses(predictions,
-                                               [p[p.sample_types == 0] for p in proposals])
-            tok = time()
-            # print('detector loss:', tok - tik)
-            storage.put_scalar("time/detector_forward", np.float32(tok - tik))
+        pseudo_words = self.box_predictor.pred_words(input_box_features)
+        predictions = dict(kd_pseudo_words=pseudo_words[sample_types == 1],
+                           caption_pseudo_words=pseudo_words[sample_types == 2])
 
-            # TODO contrastive learning
-            if self.context_modeling_cfg.ENABLE:
-                losses.update(self.context_modeling.get_loss(group_infos,
-                                                             predictions, clip_images,
-                                                             self.box_predictor.clip, image_info))
-                storage.put_scalar("time/contrast_learning", np.float32(time() - tok))
-
-            if self.cfg.MODEL.WITH_IMAGE_LABELS:
-                loss = self.image_label_loss(resized_image_info)
-                if loss is None:
-                    loss = list(losses.values())[0] * 0.0
-                losses.update(image_label_loss=loss)
-
-            if self.mask_on:
-                proposals, fg_selection_masks = select_foreground_proposals(
-                    [p[p.sample_types == 0] for p in proposals], self.num_classes
-                )
-                # Since the ROI feature transform is shared between boxes and masks,
-                # we don't need to recompute features. The mask loss is only defined
-                # on foreground proposals, so we need to select out the foreground
-                # features.
-                sample_types = torch.cat([p.sample_types for p in proposals], dim=0)
-                box_features = box_features[sample_types == 0]
-                mask_features = box_features[torch.cat(fg_selection_masks, dim=0)]
-                del box_features
-                losses.update(self.mask_head(mask_features, proposals))
-
-            return proposals, losses
-        else:
-            predictions = self.box_predictor(
-                box_features.mean(dim=[2, 3]))
-            pred_instances, _ = self.box_predictor.inference(predictions, proposals)
-            pred_instances = self.forward_with_given_boxes(features, pred_instances)
-            return pred_instances, {}
+        return predictions
