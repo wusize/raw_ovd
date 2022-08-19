@@ -1,12 +1,15 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
-from enum import Enum
+from detectron2.solver.build import maybe_add_gradient_clipping
 import itertools
-from typing import Any, Callable, Dict, Iterable, List, Set, Type, Union
+import logging
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Type, Union
 import torch
-
+from fvcore.common.param_scheduler import CosineParamScheduler, MultiStepParamScheduler,\
+    ParamScheduler
+import math
 from detectron2.config import CfgNode
 
-from detectron2.solver.build import maybe_add_gradient_clipping
+from detectron2.solver.lr_scheduler import LRMultiplier, WarmupParamScheduler
 
 def match_name_keywords(n, name_keywords):
     out = False
@@ -76,3 +79,63 @@ def build_custom_optimizer(cfg: CfgNode, model: torch.nn.Module) -> torch.optim.
     if not cfg.SOLVER.CLIP_GRADIENTS.CLIP_TYPE == "full_model":
         optimizer = maybe_add_gradient_clipping(cfg, optimizer)
     return optimizer
+
+
+def build_lr_scheduler(
+    cfg: CfgNode, optimizer: torch.optim.Optimizer
+) -> torch.optim.lr_scheduler._LRScheduler:
+    """
+    Build a LR scheduler from config.
+    """
+    name = cfg.SOLVER.LR_SCHEDULER_NAME
+
+    if name == "WarmupMultiStepLR":
+        steps = [x for x in cfg.SOLVER.STEPS if x <= cfg.SOLVER.MAX_ITER]
+        if len(steps) != len(cfg.SOLVER.STEPS):
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                "SOLVER.STEPS contains values larger than SOLVER.MAX_ITER. "
+                "These values will be ignored."
+            )
+        sched = MultiStepParamScheduler(
+            values=[cfg.SOLVER.GAMMA**k for k in range(len(steps) + 1)],
+            milestones=steps,
+            num_updates=cfg.SOLVER.MAX_ITER,
+        )
+    elif name == "WarmupCosineLR":
+        end_value = cfg.SOLVER.BASE_LR_END / cfg.SOLVER.BASE_LR
+        assert end_value >= 0.0 and end_value <= 1.0, end_value
+        sched = CosineParamScheduler(1, end_value)
+    elif name == "WarmupPeriodicCosineLR":
+        end_value = cfg.SOLVER.BASE_LR_END / cfg.SOLVER.BASE_LR
+        assert end_value >= 0.0 and end_value <= 1.0, end_value
+        sched = PeriodicCosineParamScheduler(1, end_value,
+                                             cfg.SOLVER.PERIOD / cfg.SOLVER.MAX_ITER)
+    else:
+        raise ValueError("Unknown LR scheduler: {}".format(name))
+
+    sched = WarmupParamScheduler(
+        sched,
+        cfg.SOLVER.WARMUP_FACTOR,
+        min(cfg.SOLVER.WARMUP_ITERS / cfg.SOLVER.MAX_ITER, 1.0),
+        cfg.SOLVER.WARMUP_METHOD,
+    )
+    return LRMultiplier(optimizer, multiplier=sched, max_iter=cfg.SOLVER.MAX_ITER)
+
+
+class PeriodicCosineParamScheduler(ParamScheduler):
+    def __init__(
+        self,
+        start_value: float,
+        end_value: float,
+        period: float,
+    ) -> None:
+        self._start_value = start_value
+        self._end_value = end_value
+        self._period = period
+
+    def __call__(self, where: float) -> float:
+        where = where % self._period
+        return self._end_value + 0.5 * (self._start_value - self._end_value) * (
+            1 + math.cos(math.pi * where)
+        )

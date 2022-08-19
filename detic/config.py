@@ -214,3 +214,5 @@ def add_detic_config(cfg):
 
     _C.MODEL.RPN.POS_WEIGHT = 1.0
     _C.SEED = 59952231      # fix seed
+
+    _C.SOLVER.PERIOD = 30000

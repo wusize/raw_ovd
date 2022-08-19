@@ -25,7 +25,8 @@ from detectron2.evaluation import (
     COCOEvaluator,
 )
 from detectron2.modeling import build_model
-from detectron2.solver import build_lr_scheduler, build_optimizer
+from detectron2.solver import build_optimizer
+from detic.custom_solver import build_lr_scheduler
 from detectron2.utils.events import (
     CommonMetricPrinter,
     EventStorage,
