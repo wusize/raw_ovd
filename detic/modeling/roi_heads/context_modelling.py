@@ -488,12 +488,29 @@ class ContextModelling(nn.Module):
                          predictions, clip_images,
                          clip_model,
                          image_info=None):
+        storage = get_event_storage()
         if self.cfg.LEARN_TEMP:
-            storage = get_event_storage()
             storage.put_scalar('temperature/ce',
                                self.ce_temp.data.detach().cpu().numpy())
             storage.put_scalar('temperature/token_ce',
                                self.token_temp.data.detach().cpu().numpy())
+        if self.cfg.PERIODIC:
+            iteration = storage.iteration
+            periodic_factor = math.cos(math.pi * (iteration % self.cfg.PERIOD)
+                                       / self.cfg.PERIOD)
+            periodic_factor = self.cfg.MINIMUM + 0.5 * (
+                    1.0 - self.cfg.MINIMUM) * (1.0 + periodic_factor)
+            contrast_loss_weight = self.cfg.CONTRAST_LOSS_WEIGHT * periodic_factor
+            token_loss_weight = self.cfg.TOKEN_LOSS_WEIGHT * periodic_factor
+        else:
+            contrast_loss_weight = self.cfg.CONTRAST_LOSS_WEIGHT
+            token_loss_weight = self.cfg.TOKEN_LOSS_WEIGHT
+
+        storage.put_scalar('loss_weights/contrast_loss_weight',
+                           np.float32(contrast_loss_weight))
+        storage.put_scalar('loss_weights/token_loss_weight',
+                           np.float32(token_loss_weight))
+
         self.record_class_proportions([g['sampled_instances'] for g in group_info],
                                       list(image_info.keys()), 'sampled_proportions')
         pseudo_words = predictions.pop('kd_pseudo_words')
@@ -584,7 +601,7 @@ class ContextModelling(nn.Module):
 
         loss = 0.5 * F.cross_entropy(similarity_matrix_0, label) \
                + 0.5 * F.cross_entropy(similarity_matrix_1, label)
-        losses = dict(contrast_loss=loss * self.cfg.CONTRAST_LOSS_WEIGHT)
+        losses = dict(contrast_loss=loss * contrast_loss_weight)
         # Enqueue
         queues_update = dict(clip_text_features=torch.cat([clip_text_features,
                                                            img_ids.view(-1, 1)], dim=-1).detach(),
@@ -663,7 +680,7 @@ class ContextModelling(nn.Module):
 
             loss = F.cross_entropy(similarity_matrix_0, labels) * 0.5 \
                    + F.cross_entropy(similarity_matrix_1, labels) * 0.5
-            losses.update(token_loss=loss * self.cfg.TOKEN_LOSS_WEIGHT)
+            losses.update(token_loss=loss * token_loss_weight)
 
             queues_update.update(clip_word_features=torch.cat([clip_word_features,
                                                                img_ids.view(-1, 1)], dim=-1).detach(),
