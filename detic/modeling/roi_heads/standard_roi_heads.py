@@ -62,14 +62,8 @@ class CustomStandardROIHeads(StandardROIHeads):
     def _forward_box(self, features, proposals,
                      clip_images=None, image_info=None,
                      resized_image_info=None, group_infos=None):
-        def _record_gradient(grad):
-            val = grad.norm()
-            storage = get_event_storage()
-            storage.put_scalar("gradients/detection", val.cpu().numpy())
         features = [features[f] for f in self.box_in_features]
         box_features = self.box_pooler(features, [x.proposal_boxes for x in proposals])
-        if self.training:
-            box_features.register_hook(_record_gradient)
         box_features = self.box_head(box_features)
 
         if self.training:
@@ -203,12 +197,16 @@ class CustomStandardROIHeads(StandardROIHeads):
     def _box_forward_train(self, box_features, proposals):
         sample_types = torch.cat([p.sample_types for p in proposals], dim=0)
         input_box_features = self.box_predictor.pre_forward(box_features)
-        del box_features
+
+        def _record_gradient(grad):
+            val = grad.norm()
+            storage = get_event_storage()
+            storage.put_scalar("gradients/detection", val.cpu().numpy())
+        input_box_features.register_hook(_record_gradient)
 
         pseudo_words = self.box_predictor.pred_words(input_box_features)
         scores = self.box_predictor.pred_cls_score(pseudo_words[sample_types == 0])
         proposal_deltas = self.box_predictor.bbox_pred(input_box_features[sample_types == 0])
-        del input_box_features
         predictions = dict(scores=scores,
                            proposal_deltas=proposal_deltas)
 
@@ -220,12 +218,12 @@ class CustomStandardROIHeads(StandardROIHeads):
             storage = get_event_storage()
             storage.put_scalar("gradients/contrastive", val.cpu().numpy())
         box_features = self.box_pooler(features, [x.proposal_boxes for x in sampled_instances])
-        # TODO: reweight the gradients from contrastive loss
-        box_features = _ScaleGradient.apply(box_features, self.context_modeling_cfg.GRAD_WEIGHT)
-        box_features.register_hook(_record_gradient)
         box_features = self.box_head(box_features)
         sample_types = torch.cat([p.sample_types for p in sampled_instances], dim=0)
         input_box_features = self.box_predictor.pre_forward(box_features)
+        # TODO: reweight the gradients from contrastive loss
+        input_box_features = _ScaleGradient.apply(input_box_features, self.context_modeling_cfg.GRAD_WEIGHT)
+        input_box_features.register_hook(_record_gradient)
         pseudo_words = self.box_predictor.pred_words(input_box_features)
         predictions = dict(kd_pseudo_words=pseudo_words[sample_types == 1],
                            caption_pseudo_words=pseudo_words[sample_types == 2])
