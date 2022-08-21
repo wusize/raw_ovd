@@ -115,7 +115,7 @@ class CustomStandardROIHeads(StandardROIHeads):
 
     def forward(self, images, features, proposals, targets=None,
                 ann_types=None, clip_images=None, image_info=None,
-                resized_image_info=None):
+                resized_image_info=None, **kwargs):
         '''
         enable debug and image labels
         '''
@@ -214,7 +214,7 @@ class CustomStandardROIHeads(StandardROIHeads):
 
         return predictions
 
-    def get_pseudo_words(self, sampled_instances, features):
+    def get_pseudo_words(self, sampled_instances, features, *args, **kwargs):
         def _record_gradient(grad):
             val = grad.norm()
             storage = get_event_storage()

@@ -222,3 +222,5 @@ def add_detic_config(cfg):
     _C.CONTEXT_MODELLING.MINIMUM = 0.1
 
     _C.CONTEXT_MODELLING.GRAD_WEIGHT = 1.0
+
+    _C.MODEL.ROI_BOX_HEAD.AVE_POOLING = False

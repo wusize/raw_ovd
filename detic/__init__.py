@@ -3,7 +3,7 @@ from .modeling.meta_arch import custom_rcnn
 from .modeling.roi_heads import detic_roi_heads
 from .modeling.roi_heads import (res5_roi_heads, standard_roi_heads, multilevel_roi_heads, standard_roi_heads2,
                                  fpn_res5_roi_heads, fpn_res5_cat_roi_heads, offline_standard_roi_heads,
-                                 standard_roi_heads_default)
+                                 standard_roi_heads_default, standard_roi_heads3)
 from .modeling.roi_heads.standard_roi_heads import FPNSumStandardROIHeads
 from .modeling.backbone import swintransformer
 from .modeling.backbone import timm
