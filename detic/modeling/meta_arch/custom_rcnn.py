@@ -132,6 +132,13 @@ class CustomRCNN(GeneralizedRCNN):
         """
         if not self.training:
             return self.inference(batched_inputs)
+        # TODO: record gradients on all layers
+        for k, v in self.named_parameters():
+            if v.requires_grad:
+                def _record_grad(grad):
+                    storage.put_scalar(f'parameters_gradients/{k}',
+                                       grad.norm().detach().cpu().numpy())
+                v.register_hook(_record_grad)
 
         images = self.preprocess_image(batched_inputs)
         clip_images = self.clip_preprocess_image(batched_inputs)
