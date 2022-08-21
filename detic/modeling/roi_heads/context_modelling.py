@@ -134,34 +134,33 @@ class ContextModelling(nn.Module):
         self.word_dropout = word_dropout
         self.cfg = cfg
 
-
-        # TODO add gts
-        gt_path = cfg.ALL_GTS
-        gt_coco = COCO(gt_path)
-        images = {}
         # id_map = {v: i for i, v in enumerate(sorted(list(gt_coco.cats.keys())))}
         if cfg.DATASET == 'COCO':
+            # TODO add gts
+            gt_path = cfg.ALL_GTS
+            gt_coco = COCO(gt_path)
+            images = {}
             unseen_cat_ids = [cat['id'] for cat in categories_unseen]
+            all_gt_is_unseen = []
+            for img_id, anns in gt_coco.imgToAnns.items():
+                gt_boxes = torch.tensor([ann['bbox'] for ann in anns])
+                gt_boxes[:, 2:] = gt_boxes[:, 2:] + gt_boxes[:, :2]
+                # gt_classes = torch.tensor([id_map[ann['category_id']] for ann in anns]).long()
+                gt_is_unseen = torch.tensor([1 if ann['category_id'] in unseen_cat_ids else 0
+                                             for ann in anns]).float()
+                all_gt_is_unseen.append(gt_is_unseen)
+
+                img_info = gt_coco.imgs[img_id]
+                image_size = (img_info['height'], img_info['width'])
+
+                images[img_id] = dict(gt_boxes=gt_boxes, gt_is_unseen=gt_is_unseen,
+                                      image_size=image_size)
+            unseen_ratio = torch.cat(all_gt_is_unseen).mean()
+            print(f'Ratio of novel boxes: {unseen_ratio}', flush=True)
+
+            self.images = images
         else:
-            raise NotImplementedError
-        all_gt_is_unseen = []
-        for img_id, anns in gt_coco.imgToAnns.items():
-            gt_boxes = torch.tensor([ann['bbox'] for ann in anns])
-            gt_boxes[:, 2:] = gt_boxes[:, 2:] + gt_boxes[:, :2]
-            # gt_classes = torch.tensor([id_map[ann['category_id']] for ann in anns]).long()
-            gt_is_unseen = torch.tensor([1 if ann['category_id'] in unseen_cat_ids else 0
-                                         for ann in anns]).float()
-            all_gt_is_unseen.append(gt_is_unseen)
-
-            img_info = gt_coco.imgs[img_id]
-            image_size = (img_info['height'], img_info['width'])
-
-            images[img_id] = dict(gt_boxes=gt_boxes, gt_is_unseen=gt_is_unseen,
-                                  image_size=image_size)
-        unseen_ratio = torch.cat(all_gt_is_unseen).mean()
-        print(f'Ratio of novel boxes: {unseen_ratio}', flush=True)
-
-        self.images = images
+            self.images = None
 
         checkboard_cfg = cfg.CHECKBOARD
         if sigmoid:
@@ -345,7 +344,7 @@ class ContextModelling(nn.Module):
 
     # TODO: input topk proposals
     def sample(self, proposals_per_image, mask_on=False, image_id=None):
-        if image_id is not None:
+        if image_id is not None and self.images is not None:
             gt_ious_scores = self.get_topk_average_scores(proposals_per_image, image_id)
         else:
             gt_ious_scores = None
@@ -504,9 +503,9 @@ class ContextModelling(nn.Module):
                            np.float32(contrast_loss_weight))
         storage.put_scalar('loss_weights/token_loss_weight',
                            np.float32(token_loss_weight))
-
-        self.record_class_proportions([g['sampled_instances'] for g in group_info],
-                                      list(image_info.keys()), 'sampled_proportions')
+        if self.images is not None:
+            self.record_class_proportions([g['sampled_instances'] for g in group_info],
+                                          list(image_info.keys()), 'sampled_proportions')
         pseudo_words = predictions.pop('kd_pseudo_words')
         # pseudo_words.register_hook(self._record_gradient)
         device = pseudo_words.device
