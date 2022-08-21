@@ -187,16 +187,16 @@ class CustomStandardROIHeads(StandardROIHeads):
         storage.put_scalar("roi_head/num_fg_samples", np.mean(num_fg_samples))
         storage.put_scalar("roi_head/num_bg_samples", np.mean(num_bg_samples))
 
-        for k in ['base_scores', 'novel_scores', 'base_ious', 'novel_ious', 'bg_scores']:
-            values = np.concatenate([g['gt_ious_scores'][k] for g in group_infos], axis=0)
-            if len(values) > 0:
-                val = values.mean()
-            else:
-                if f"gt_ious_scores/{k}" in storage._latest_scalars:
-                    val = storage._latest_scalars[f"gt_ious_scores/{k}"][0]
-                else:
-                    val = np.zeros(1).sum()
-            storage.put_scalar(f"gt_ious_scores/{k}", val)
+        # for k in ['base_scores', 'novel_scores', 'base_ious', 'novel_ious', 'bg_scores']:
+        #     values = np.concatenate([g['gt_ious_scores'][k] for g in group_infos], axis=0)
+        #     if len(values) > 0:
+        #         val = values.mean()
+        #     else:
+        #         if f"gt_ious_scores/{k}" in storage._latest_scalars:
+        #             val = storage._latest_scalars[f"gt_ious_scores/{k}"][0]
+        #         else:
+        #             val = np.zeros(1).sum()
+        #     storage.put_scalar(f"gt_ious_scores/{k}", val)
 
         return proposals_with_gt, group_infos
 
