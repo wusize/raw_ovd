@@ -8,7 +8,8 @@ from PIL import Image
 
 
 from detectron2.data import transforms as T
-from .transforms.custom_augmentation_impl import EfficientDetResizeCrop
+from .transforms.custom_augmentation_impl import EfficientDetResizeCrop, CustomFixedSizeCrop
+
 
 def build_custom_augmentation(cfg, is_train, scale=None, size=None, \
     min_size=None, max_size=None):
@@ -49,7 +50,7 @@ def build_custom_augmentation(cfg, is_train, scale=None, size=None, \
                 min_scale=min(scale), max_scale=max(scale),
                 target_height=size, target_width=size
             ),
-            T.FixedSizeCrop(crop_size=(size, size)),
+            CustomFixedSizeCrop(crop_size=(size, size)),
         ]
     else:
         assert 0, cfg.INPUT.CUSTOM_AUG

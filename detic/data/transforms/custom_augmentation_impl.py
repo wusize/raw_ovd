@@ -14,7 +14,7 @@ from fvcore.transforms.transform import (
     VFlipTransform,
 )
 from PIL import Image
-
+from detectron2.data.transforms.augmentation_impl import FixedSizeCrop
 from detectron2.data.transforms.augmentation import Augmentation
 from .custom_transform import EfficientDetResizeCropTransform
 
@@ -58,3 +58,31 @@ class EfficientDetResizeCrop(Augmentation):
         offset_x = int(max(0.0, float(offset_x)) * np.random.uniform(0, 1))
         return EfficientDetResizeCropTransform(
             scaled_h, scaled_w, offset_y, offset_x, img_scale, self.target_size, self.interp)
+
+
+class CustomFixedSizeCrop(FixedSizeCrop):
+    def _get_crop(self, image: np.ndarray) -> Transform:
+        # Compute the image scale and scaled size.
+        input_size = image.shape[:2]
+        output_size = self.crop_size
+
+        # Add random crop if the image is scaled up.
+        max_offset = np.subtract(input_size, output_size)
+        max_offset = np.maximum(max_offset, 0)
+        offset = np.multiply(max_offset, np.random.uniform(0.0, 1.0))
+        offset = np.round(offset).astype(int)
+        return CustomCropTransform(
+            offset[1], offset[0], output_size[1], output_size[0], input_size[1], input_size[0]
+        )
+
+
+class CustomCropTransform(CropTransform):
+    def apply_coords(self, coords: np.ndarray) -> np.ndarray:
+        coords = super(CustomCropTransform, self).apply_coords(coords)
+        # TODO: limit coords into the valid range
+        x_max = min(self.orig_w - self.x0, self.w)
+        y_max = min(self.orig_h - self.y0, self.h)
+        coords[:, 0] = np.clip(coords[:, 0], a_min=0, a_max=x_max)
+        coords[:, 1] = np.clip(coords[:, 1], a_min=0, a_max=y_max)
+
+        return coords
