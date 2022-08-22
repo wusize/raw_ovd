@@ -1,4 +1,4 @@
-_BASE_: "../Base_OVCOCO_FPN_100e_lsj.yaml"
+_BASE_: "./Base_OVCOCO_FPN_100e_lsj.yaml"
 MODEL:
   ROI_BOX_HEAD:
     RANDOM_DROPOUT: 0.5
