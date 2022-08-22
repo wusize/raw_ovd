@@ -37,6 +37,20 @@ def build_custom_augmentation(cfg, is_train, scale=None, size=None, \
             scale = (1, 1)
             size = cfg.INPUT.TEST_SIZE
         augmentation = [EfficientDetResizeCrop(size, scale)]
+    elif cfg.INPUT.CUSTOM_AUG == 'LargeScaleJittering':
+        if is_train:
+            scale = cfg.INPUT.SCALE_RANGE if scale is None else scale
+            size = cfg.INPUT.TRAIN_SIZE if size is None else size
+        else:
+            scale = (1, 1)
+            size = cfg.INPUT.TEST_SIZE
+        augmentation = [
+            T.ResizeScale(
+                min_scale=min(scale), max_scale=max(scale),
+                target_height=size, target_width=size
+            ),
+            T.FixedSizeCrop(crop_size=(size, size)),
+        ]
     else:
         assert 0, cfg.INPUT.CUSTOM_AUG
 
