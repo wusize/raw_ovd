@@ -169,6 +169,9 @@ def do_train(cfg, model, resume=False):
         data_timer = Timer()
         start_time = time.perf_counter()
         for data, iteration in zip(data_loader, range(start_iter, max_iter)):
+            print(f"rank: {comm.get_rank()}, iteration: {iteration}, "
+                  f"image_ids: {[d['image_id'] for d in data]}",
+                  flush=True)
             data_time = data_timer.seconds()
             storage.put_scalars(data_time=data_time)
             step_timer.reset()
