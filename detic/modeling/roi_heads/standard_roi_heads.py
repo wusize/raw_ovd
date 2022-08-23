@@ -142,6 +142,15 @@ class CustomStandardROIHeads(StandardROIHeads):
 
     @torch.no_grad()
     def label_and_sample_proposals(self, proposals, targets, ann_types, image_ids):
+        # TODO: context sampling before appending gts
+        group_infos = []
+        assert len(proposals) == len(targets)
+        for proposals_per_image, targets_per_image in zip(proposals, targets):
+            sampled_instances, group_info = self.context_modeling.sample(
+                proposals_per_image, self.mask_on, targets=targets_per_image)
+            group_info['sampled_instances'] = sampled_instances
+            group_infos.append(group_info)
+        # TODO: suppress base boxes for context sampling
         if self.proposal_append_gt:
             proposals = add_ground_truth_to_proposals(targets, proposals)
 
@@ -149,9 +158,9 @@ class CustomStandardROIHeads(StandardROIHeads):
 
         num_fg_samples = []
         num_bg_samples = []
-        group_infos = []
-        for proposals_per_image, targets_per_image, ann_type, image_id in \
-                zip(proposals, targets, ann_types, image_ids):
+        assert len(proposals) == len(ann_types)
+        for proposals_per_image, targets_per_image, ann_type in \
+                zip(proposals, targets, ann_types):
             has_gt = len(targets_per_image) > 0
             match_quality_matrix = pairwise_iou(
                 targets_per_image.gt_boxes, proposals_per_image.proposal_boxes
@@ -160,9 +169,6 @@ class CustomStandardROIHeads(StandardROIHeads):
             sampled_idxs, gt_classes = self._sample_proposals(
                 matched_idxs, matched_labels, targets_per_image.gt_classes
             )
-            sampled_instances, group_info = self.context_modeling.sample(proposals_per_image, self.mask_on, image_id)
-            group_info['sampled_instances'] = sampled_instances
-            group_infos.append(group_info)
             # sample type: -1 for topk; 0 for det; 1 for clip-img; 2 for caption
 
             # Set target attributes of the sampled proposals:
@@ -186,17 +192,6 @@ class CustomStandardROIHeads(StandardROIHeads):
         storage = get_event_storage()
         storage.put_scalar("roi_head/num_fg_samples", np.mean(num_fg_samples))
         storage.put_scalar("roi_head/num_bg_samples", np.mean(num_bg_samples))
-
-        # for k in ['base_scores', 'novel_scores', 'base_ious', 'novel_ious', 'bg_scores']:
-        #     values = np.concatenate([g['gt_ious_scores'][k] for g in group_infos], axis=0)
-        #     if len(values) > 0:
-        #         val = values.mean()
-        #     else:
-        #         if f"gt_ious_scores/{k}" in storage._latest_scalars:
-        #             val = storage._latest_scalars[f"gt_ious_scores/{k}"][0]
-        #         else:
-        #             val = np.zeros(1).sum()
-        #     storage.put_scalar(f"gt_ious_scores/{k}", val)
 
         return proposals_with_gt, group_infos
 

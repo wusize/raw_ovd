@@ -343,7 +343,7 @@ class ContextModelling(nn.Module):
         return self._sample_topk_proposals(proposals_per_image, mask_on)
 
     # TODO: input topk proposals
-    def sample(self, proposals_per_image, mask_on=False, image_id=None):
+    def sample(self, proposals_per_image, mask_on=False, image_id=None, *args, **kwargs):
         if image_id is not None and self.images is not None:
             gt_ious_scores = self.get_topk_average_scores(proposals_per_image, image_id)
         else:

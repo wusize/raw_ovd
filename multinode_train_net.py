@@ -43,14 +43,16 @@ from centernet.config import add_centernet_config
 sys.path.insert(0, 'third_party/Deformable-DETR')
 from detic.config import add_detic_config
 from detic.data.custom_build_augmentation import build_custom_augmentation
-from detic.data.custom_dataset_dataloader import build_custom_train_loader
+from detic.data.custom_dataset_dataloader import  build_custom_train_loader
 from detic.data.custom_dataset_mapper import CustomDatasetMapper, DetrDatasetMapper
 from detic.custom_solver import build_custom_optimizer
 from detic.evaluation.oideval import OIDEvaluator
 from detic.evaluation.custom_coco_eval import CustomCOCOEvaluator
 from detic.modeling.utils import reset_cls_test
 from detic.custom_solver import build_lr_scheduler
-
+from detectron2.utils.logger import _log_api_usage
+from detectron2.data.build import get_detection_dataset_dicts
+from detectron2.data.samplers import TrainingSampler, RepeatFactorTrainingSampler
 logger = logging.getLogger("detectron2")
 
 def do_test(cfg, model):
@@ -134,7 +136,27 @@ def do_train(cfg, model, resume=False):
         DetrDatasetMapper(cfg, True) if cfg.INPUT.CUSTOM_AUG == 'DETR' else \
         MapperClass(cfg, True, augmentations=build_custom_augmentation(cfg, True))
     if cfg.DATALOADER.SAMPLER_TRAIN in ['TrainingSampler', 'RepeatFactorTrainingSampler']:
-        data_loader = build_detection_train_loader(cfg, mapper=mapper)
+        #######################   For multiple machine training, fix seed
+        assert cfg.SEED >= 0
+        sampler_name = cfg.DATALOADER.SAMPLER_TRAIN
+        dataset = get_detection_dataset_dicts(
+            cfg.DATASETS.TRAIN,
+            filter_empty=cfg.DATALOADER.FILTER_EMPTY_ANNOTATIONS,
+            min_keypoints=cfg.MODEL.ROI_KEYPOINT_HEAD.MIN_KEYPOINTS_PER_IMAGE
+            if cfg.MODEL.KEYPOINT_ON
+            else 0,
+            proposal_files=cfg.DATASETS.PROPOSAL_FILES_TRAIN if cfg.MODEL.LOAD_PROPOSALS else None,
+        )
+        _log_api_usage("dataset." + cfg.DATASETS.TRAIN[0])
+        if sampler_name == "TrainingSampler":
+            sampler = TrainingSampler(len(dataset), seed=cfg.SEED)
+        else:
+            repeat_factors = RepeatFactorTrainingSampler.repeat_factors_from_category_frequency(
+                dataset, cfg.DATALOADER.REPEAT_THRESHOLD
+            )
+            sampler = RepeatFactorTrainingSampler(repeat_factors, seed=cfg.SEED)
+        #######################
+        data_loader = build_detection_train_loader(cfg, mapper=mapper, sampler=sampler)
     else:
         data_loader = build_custom_train_loader(cfg, mapper=mapper)
 
@@ -147,6 +169,9 @@ def do_train(cfg, model, resume=False):
         data_timer = Timer()
         start_time = time.perf_counter()
         for data, iteration in zip(data_loader, range(start_iter, max_iter)):
+            # print(f"rank: {comm.get_rank()}, iteration: {iteration}, "
+            #       f"image_ids: {[d['image_id'] for d in data]}",
+            #       flush=True)
             data_time = data_timer.seconds()
             storage.put_scalars(data_time=data_time)
             step_timer.reset()
