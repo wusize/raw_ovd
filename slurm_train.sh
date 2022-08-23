@@ -5,7 +5,6 @@
 #SBATCH --ntasks-per-node=8
 #SBATCH --ntasks=16
 #SBATCH --cpus-per-task=5
-#SBATCH --mem=496G
 #SBATCH --time 4320
 #SBATCH -o "slurm-output/slurm-%j.out"
 
