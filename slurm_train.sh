@@ -1,9 +1,5 @@
 #!/bin/bash
-
-PARTITION=$1
-SRUN_ARGS=${SRUN_ARGS:-""}
-
-#SBATCH -p ${PARTITION}
+#SBATCH -p mm_research
 #SBATCH --nodes=2
 #SBATCH --gres=gpu:8
 #SBATCH --gpus-per-node=8
@@ -12,4 +8,4 @@ SRUN_ARGS=${SRUN_ARGS:-""}
 #SBATCH --time 4320
 #SBATCH -o "slurm-output/slurm-%j.out"
 
-srun ${SRUN_ARGS} multi-node_run.sh $@
+srun --quota=spot multi-node_run.sh $@
