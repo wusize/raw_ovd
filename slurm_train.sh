@@ -1,6 +1,7 @@
 #!/bin/bash
 
 PARTITION=$1
+SRUN_ARGS=${SRUN_ARGS:-""}
 
 #SBATCH -p ${PARTITION}
 #SBATCH --nodes=2
@@ -11,4 +12,4 @@ PARTITION=$1
 #SBATCH --time 4320
 #SBATCH -o "slurm-output/slurm-%j.out"
 
-srun multi-node_run.sh $@
+srun ${SRUN_ARGS} multi-node_run.sh $@
