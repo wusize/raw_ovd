@@ -7,6 +7,6 @@
 #SBATCH --quotatype=spot
 #SBATCH --cpus-per-task=5
 #SBATCH --time 4320
-#SBATCH -o "slurm-output/slurm-%j.out"
+#SBATCH -o "output/slurm-%j.out"
 
 srun multi-node_run.sh $@
