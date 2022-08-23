@@ -144,7 +144,7 @@ class CustomStandardROIHeads(StandardROIHeads):
     def label_and_sample_proposals(self, proposals, targets, ann_types, image_ids):
         # TODO: context sampling before appending gts
         group_infos = []
-        assert len(proposals) == len(targets)
+        assert len(proposals) == len(targets), f'{image_ids}'
         for proposals_per_image, targets_per_image in zip(proposals, targets):
             sampled_instances, group_info = self.context_modeling.sample(
                 proposals_per_image, self.mask_on, targets=targets_per_image)
@@ -158,7 +158,7 @@ class CustomStandardROIHeads(StandardROIHeads):
 
         num_fg_samples = []
         num_bg_samples = []
-        assert len(proposals) == len(ann_types)
+        assert len(proposals) == len(ann_types), f'{image_ids}'
         for proposals_per_image, targets_per_image, ann_type in \
                 zip(proposals, targets, ann_types):
             has_gt = len(targets_per_image) > 0
