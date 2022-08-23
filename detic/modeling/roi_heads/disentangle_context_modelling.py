@@ -23,7 +23,7 @@ class ContextModellingV2(ContextModelling):
         if targets is not None and len(targets) > 0:
             # the targets are all base annotations
             gt_boxes = targets.gt_boxes
-            ious_with_gts = box_iou(topk_proposals.proposal_boxes, gt_boxes)
+            ious_with_gts = box_iou(topk_proposals.proposal_boxes.tensor, gt_boxes.tensor)
             ious_with_gts = ious_with_gts.max(-1).values
 
             valid = ious_with_gts < self.cfg.MAX_IOU_WITH_GT
