@@ -9,4 +9,4 @@
 #SBATCH --time 4320
 #SBATCH -o "output/slurm-%j.out"
 
-srun multi-node_run.sh $@
+bash multi-node_run.sh $@
