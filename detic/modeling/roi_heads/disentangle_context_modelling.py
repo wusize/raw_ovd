@@ -1,6 +1,7 @@
 from .context_modelling import ContextModelling
 from torchvision.ops import box_iou
-
+from detectron2.modeling.proposal_generator.proposal_utils import \
+    add_ground_truth_to_proposals_single_image
 
 class ContextModellingV2(ContextModelling):
     def get_loss(self, group_infos, clip_images, clip_model, image_info, roi_head, features, *args, **kwargs):
@@ -18,6 +19,9 @@ class ContextModellingV2(ContextModelling):
         return added_instances, info
 
     def _sample_topk_proposals(self, proposals_per_image, mask_on=False, targets=None):
+        if self.cfg.APPEND_GT:                   # preserve gt
+            proposals_per_image = add_ground_truth_to_proposals_single_image(targets,
+                                                                             proposals_per_image)
         topk_proposals = super(ContextModellingV2, self)._sample_topk_proposals(proposals_per_image,
                                                                                 mask_on)
         if targets is not None and len(targets) > 0:
