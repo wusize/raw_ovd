@@ -69,7 +69,6 @@ class CustomStandardROIHeads(StandardROIHeads):
                 losses.update(
                     self.context_modeling.get_loss(group_info, clip_images, self.box_predictor.clip, image_info))
 
-            losses = dict()
             storage = get_event_storage()
             tik = time()
             predictions = self._box_forward_train(box_features)
