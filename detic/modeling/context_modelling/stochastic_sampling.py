@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-import random
 from detic.modeling.utils import multi_apply
 import math
 
