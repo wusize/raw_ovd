@@ -10,7 +10,8 @@ from detectron2.utils.events import get_event_storage
 from detectron2.modeling.proposal_generator.proposal_utils \
     import add_ground_truth_to_proposals
 from detectron2.structures import pairwise_iou
-from detic.modeling.context_modelling.context_modelling import ContextModelling
+from detic.modeling.context_modelling.context_modellingv2 import ContextModellingV2 as \
+    ContextModelling
 from time import time
 
 
@@ -44,10 +45,30 @@ class CustomStandardROIHeads(StandardROIHeads):
                      clip_images=None, image_info=None,
                      resized_image_info=None):
         features = [features[f] for f in self.box_in_features]
+
+        # TODO: let the box_features from det and contrast to combined to pass the box_head
         box_features = self.box_pooler(features, [x.proposal_boxes for x in proposals])
-        box_features = self.box_head(box_features)
 
         if self.training:
+            losses = {}
+            # TODO contrastive learning
+            if self.context_modeling_cfg.ENABLE:
+                device = clip_images.tensor.device
+                group_info = self.context_modeling.sample(clip_images.image_sizes)
+                sampled_instances = group_info.pop('sampled_instances')
+                sampled_instances = [inst.to(device) for inst in sampled_instances]
+                added_box_features = self._box_pooling_by_level(sampled_instances, features)
+                box_features = torch.cat([box_features, added_box_features], dim=0)
+
+            box_features = self.box_head(box_features)
+            if self.context_modeling_cfg.ENABLE:
+                box_features, added_box_features = box_features[:-added_box_features.shape[0]], \
+                                                   box_features[-added_box_features.shape[0]:]
+                pseudo_words = self.get_pseudo_words(added_box_features)
+                group_info.update(pseudo_words=pseudo_words)
+                losses.update(
+                    self.context_modeling.get_loss(group_info, clip_images, self.box_predictor.clip, image_info))
+
             losses = dict()
             storage = get_event_storage()
             tik = time()
@@ -56,12 +77,6 @@ class CustomStandardROIHeads(StandardROIHeads):
             tok = time()
             # print('detector loss:', tok - tik)
             storage.put_scalar("time/detector_forward", np.float32(tok - tik))
-
-            # TODO contrastive learning
-            if self.context_modeling_cfg.ENABLE:
-                losses.update(
-                    self.context_modeling.get_loss(clip_images, self.box_predictor.clip, image_info, features, self))
-                storage.put_scalar("time/contrast_learning", np.float32(time() - tok))
 
             if self.train_on_pred_boxes:
                 with torch.no_grad():
@@ -73,6 +88,7 @@ class CustomStandardROIHeads(StandardROIHeads):
 
             return losses
         else:
+            box_features = self.box_head(box_features)
             predictions = self.box_predictor(box_features)
             del box_features
             pred_instances, _ = self.box_predictor.inference(predictions, proposals)
@@ -188,10 +204,8 @@ class CustomStandardROIHeads(StandardROIHeads):
 
         return output
 
-    def get_pseudo_words(self, sampled_instances, features):
+    def get_pseudo_words(self, box_features):
         # TODO: make sure the level_id is correctly assigned
-        box_features = self._box_pooling_by_level(sampled_instances, features)
-        box_features = self.box_head(box_features)
         input_box_features = self.box_predictor.pre_forward(box_features)
         pseudo_words = self.box_predictor.pred_words(input_box_features)
 
