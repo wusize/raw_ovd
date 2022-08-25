@@ -87,6 +87,7 @@ class ShiftWindowSampling:
         box_ids_tensor = torch.cat(box_ids_per_level, dim=0)
         sampled_instances = Instances(image_size=image_size,
                                       boxes=Boxes(boxes_tensor),
+                                      levels=torch.ones_like(box_ids_tensor) * level,
                                       box_ids=box_ids_tensor)
 
         return sampled_instances, normed_boxes_per_level, spanned_boxes_per_level
