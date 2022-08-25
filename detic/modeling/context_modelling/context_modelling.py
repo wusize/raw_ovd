@@ -273,6 +273,8 @@ class ContextModelling(nn.Module):
         global_clip_image_features = self.queues.get_queue('clip_image_features')
         global_clip_text_features = self.queues.get_queue('clip_text_features')
         num_queries = clip_text_features.shape[0]
+        if clip_image_features.shape[0] != num_queries:
+            import pdb; pdb.set_trace()                # debug
         assert clip_image_features.shape[0] == num_queries, f'{list(image_info.keys())}'
         label_mask = group_ids_permuted[None] == group_ids_permuted[:, None]
         label_mask.fill_diagonal_(False)
