@@ -46,7 +46,7 @@ class ShiftWindowSampling:
         x0 = torch.arange(split).float() * box_w
         y0 = torch.arange(split).float() * box_h
 
-        grid_x0, grid_y0 = torch.meshgrid(x0, y0, indexing='xy')
+        grid_y0, grid_x0 = torch.meshgrid(y0, x0)
 
         boxes = torch.stack([grid_x0, grid_y0, grid_x0 + box_w, grid_y0 + box_h],
                             dim=-1)
