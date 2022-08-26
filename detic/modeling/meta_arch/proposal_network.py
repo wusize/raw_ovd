@@ -1,16 +1,16 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 import logging
-from torch import nn
 from detectron2.structures import ImageList
 from detectron2.utils.logger import log_first_n
 
 from detectron2.modeling.meta_arch.build import META_ARCH_REGISTRY
+from detectron2.modeling.meta_arch import ProposalNetwork
 
 __all__ = ["CustomProposalNetwork"]
 
 
 @META_ARCH_REGISTRY.register()
-class CustomProposalNetwork(nn.Module):
+class CustomProposalNetwork(ProposalNetwork):
     def forward(self, batched_inputs):
         """
         Args:
