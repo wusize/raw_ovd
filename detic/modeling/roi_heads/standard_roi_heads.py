@@ -44,7 +44,7 @@ class CustomStandardROIHeads(StandardROIHeads):
 
     def _forward_box(self, features, proposals,
                      clip_images=None, image_info=None,
-                     resized_image_info=None, group_infos=None):
+                     resized_image_info=None, group_infos=None, targets=None):
         features = [features[f] for f in self.box_in_features]
         box_features = self.box_pooler(features, [x.proposal_boxes for x in proposals])
         box_features = self.box_head(box_features)
@@ -53,7 +53,7 @@ class CustomStandardROIHeads(StandardROIHeads):
             losses = dict()
             storage = get_event_storage()
             tik = time()
-            predictions = self._box_forward_train(box_features, proposals)
+            predictions = self._box_forward_train(box_features, proposals, targets)
             losses.update(self.box_predictor.losses(predictions,
                                                     [p[p.sample_types == 0] for p in proposals]))
             tok = time()
@@ -99,9 +99,8 @@ class CustomStandardROIHeads(StandardROIHeads):
         if self.training:
             proposals, group_infos = self.label_and_sample_proposals(
                 proposals, targets, ann_types=ann_types)
-            del targets
             losses = self._forward_box(features, proposals, clip_images, image_info,
-                                       resized_image_info, group_infos)
+                                       resized_image_info, group_infos, targets=targets)
             # Usually the original proposals used by the box head are used by the mask, keypoint
             # heads. But when `self.train_on_pred_boxes is True`, proposals will contain boxes
             # predicted by the box head.
