@@ -13,6 +13,7 @@ from detectron2.modeling.proposal_generator.proposal_utils \
 from detectron2.structures import pairwise_iou
 from detic.modeling.roi_heads.context_modelling import ContextModelling
 from time import time
+from torchvision.ops import box_iou
 
 
 @ROI_HEADS_REGISTRY.register()
@@ -162,11 +163,30 @@ class CustomStandardROIHeads(StandardROIHeads):
 
         return proposals_with_gt, group_infos
 
-    def _box_forward_train(self, box_features, proposals):
+    def _box_forward_train(self, box_features, proposals, targets):
         input_box_features = self.box_predictor.pre_forward(box_features)
         del box_features
-        pseudo_words = self.box_predictor.pred_words(input_box_features)
+        pseudo_words_ = self.box_predictor.pred_words(input_box_features)
         sample_types = torch.cat([p.sample_types for p in proposals], dim=0)
+
+        # TODO: detach base words for context modelling
+        if self.context_modeling_cfg.DETACH_BASE:
+            iou_with_gt_base = [box_iou(p.proposal_boxes.tensor,
+                                        t.gt_boxes.tensor).max(-1).values
+                                if len(t) > 0
+                                else
+                                p.proposal_boxes.tensor.new_zeros(len(p))
+                                for p, t in zip(proposals, targets)
+                                ]
+            iou_with_gt_base = torch.cat(iou_with_gt_base)
+            pseudo_words = torch.zeros_like(pseudo_words_)
+            need_detach = torch.logical_and(sample_types > 0,
+                                            iou_with_gt_base > self.context_modeling_cfg.DETACH_THR)
+            pseudo_words[need_detach] = pseudo_words_[need_detach].detach()
+            pseudo_words[need_detach.logical_not()] = pseudo_words_[need_detach.logical_not()]
+        else:
+            pseudo_words = pseudo_words_
+
         storage = get_event_storage()
         tik = time()
         scores = self.box_predictor.pred_cls_score(pseudo_words[sample_types == 0])

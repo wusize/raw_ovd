@@ -201,3 +201,6 @@ def add_detic_config(cfg):
                                         'clip_caption_features']
     _C.MODEL.SAVE_PROPOSALS = False
     _C.SAVE_DEBUG_PATH = 'output/save_debug/'
+
+    _C.CONTEXT_MODELLING.DETACH_BASE = False
+    _C.CONTEXT_MODELLING.DETACH_THR = 0.7
