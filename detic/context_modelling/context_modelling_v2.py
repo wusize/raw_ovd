@@ -22,7 +22,9 @@ class ContextModellingV2(ContextModelling):
 
         self.proposals = proposals
 
-    def _get_proposals(self, image_id, tar_image_size):
+    def _get_proposals(self, image_id, gt_instances):
+        tar_image_size = gt_instances.image_size
+        device = gt_instances.gt_boxes.device
         if image_id in self.proposals:
             proposals = self.proposals[image_id]
             ori_image_size = proposals.image_size
@@ -32,28 +34,25 @@ class ContextModellingV2(ContextModelling):
             num_boxes = len(boxes)
             proposals = Instances(image_size=tar_image_size,
                                   proposal_boxes=boxes,
-                                  objectness_logits=torch.ones(num_boxes),  # ~0.7
-                                  gt_classes=-torch.ones(num_boxes),
-                                  gt_boxes=boxes,
-                                  sample_types=-torch.ones(num_boxes).int()
-                                  )
+                                  objectness_logits=torch.ones(num_boxes)).to(device)
         else:
             proposals = Instances(image_size=tar_image_size,
                                   proposal_boxes=Boxes(torch.zeros(0, 4)),
-                                  objectness_logits=torch.ones(0),  # ~0.7
-                                  gt_classes=-torch.ones(0),
-                                  gt_boxes=Boxes(torch.zeros(0, 4)),
-                                  sample_types=-torch.ones(0).int()
-                                  )
+                                  objectness_logits=torch.ones(0)).to(device)
+
+        if self.cfg.ADD_GT:
+            proposals = add_ground_truth_to_proposals_single_image(gt=gt_instances,
+                                                                   proposals=proposals)
+        num_proposals = len(proposals)
+        proposals.set('gt_classes', -torch.ones(num_proposals, device=device, dtype=torch.int64))
+        proposals.set('gt_boxes', Boxes(torch.zeros(num_proposals, 4, device=device)))
+        proposals.set('sample_types', -torch.ones(num_proposals, device=device).int())
 
         return proposals
 
     # TODO: input topk proposals
     def sample(self, image_id, gt_instances, mask_on=False):
-        proposals = self._get_proposals(image_id, gt_instances.image_size
-                                        ).to(gt_instances.gt_boxes.device)
-        if self.cfg.ADD_GT:
-            proposals = add_ground_truth_to_proposals_single_image(gt=gt_instances, proposals=proposals)
+        proposals = self._get_proposals(image_id, gt_instances)
         if mask_on:
             proposals.set('gt_masks',
                           PolygonMasks([[np.asarray([0.0, 0.0, 0.0, 1.0, 1.0, 0.0])]] * len(proposals)))
