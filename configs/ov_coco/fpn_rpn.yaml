@@ -1,11 +1,16 @@
 MODEL:
   META_ARCHITECTURE: "CustomProposalNetwork"
+  BACKBONE:
+    NAME: "build_resnet_fpn_backbone"
+  RESNETS:
+    DEPTH: 50
+    OUT_FEATURES: [ "res2", "res3", "res4", "res5" ]
+  FPN:
+    IN_FEATURES: [ "res2", "res3", "res4", "res5" ]
   RPN:
     PRE_NMS_TOPK_TEST: 12000
     POST_NMS_TOPK_TEST: 1000
   WEIGHTS: "models/R-50.pkl"
-  RESNETS:
-    DEPTH: 50
 
 DATASETS:
   TRAIN: ("coco_zeroshot_train_oriorder",)
