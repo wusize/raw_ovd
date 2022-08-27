@@ -1,10 +1,10 @@
 import json
 import argparse
 import random
-
+random.seed(100)
 parser = argparse.ArgumentParser()
-parser.add_argument("--json_path", default="datasets/coco/annotations/instances_val2017.json", type=str)
-parser.add_argument("--out_path", default="datasets/coco/zero-shot/instances_val2017.json")
+parser.add_argument("--json_path", default="datasets/coco/annotations/instances_train2017.json", type=str)
+parser.add_argument("--out_path", default="datasets/coco/zero-shot/instances_train2017.json")
 parser.add_argument("--num_samples", default=5000, type=int)
 args = parser.parse_args()
 

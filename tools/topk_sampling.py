@@ -1,9 +1,8 @@
 from detectron2.data import detection_utils, transforms
 from detectron2.config import get_cfg
 from pycocotools.coco import COCO
-from detectron2.structures import BoxMode, Instances, Boxes
+from detectron2.structures import BoxMode
 from detectron2.modeling.proposal_generator.proposal_utils import add_ground_truth_to_proposals
-from copy import deepcopy
 import cv2
 import os
 import sys
@@ -14,6 +13,15 @@ sys.path.insert(0, 'third_party/Deformable-DETR')
 from detic.modeling.roi_heads.context_modelling import ContextModelling
 from detic.config import add_detic_config
 from detic.data.datasets.coco_zeroshot import categories_unseen
+
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("--image_root", default="'datasets/coco/train2017'", type=str)
+parser.add_argument("--output_root", type=str)
+parser.add_argument("--json_path", type=str)
+parser.add_argument('--proposal_path', type=str)
+args = parser.parse_args()
+
 novel_cat_ids = [cat['id'] for cat in categories_unseen]
 
 def visualizer(image, topk_proposals, out_name):
@@ -32,12 +40,12 @@ augs = detection_utils.build_augmentation(cfg, True)
 augs = transforms.AugmentationList(augs)
 sampler = ContextModelling(cfg.CONTEXT_MODELLING, 4, 512, 0.5, sigmoid=True)
 
-output_root = r'G:\results\c4_topk'
+output_root = args.output_root
 os.makedirs(output_root, exist_ok=True)
-image_root = 'datasets/coco/val2017'
-json_path = 'datasets/coco/annotations/instances_val2017.json'
+image_root = args.image_root
+json_path = args.json_path
 coco = COCO(json_path)
-proposal_path = 'output/c4_instances_predictions.pth'
+proposal_path = args.proposal_path
 instances = torch.load(proposal_path)
 img2instances = {inst['image_id']: inst['proposals'] for inst in instances}
 
