@@ -1,5 +1,5 @@
 MODEL:
-  META_ARCHITECTURE: "CustomProposalNetwork"
+  META_ARCHITECTURE: "ProposalNetwork"
   BACKBONE:
     NAME: "build_resnet_fpn_backbone"
   RESNETS:
