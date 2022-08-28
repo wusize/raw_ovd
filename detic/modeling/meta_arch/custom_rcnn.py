@@ -46,9 +46,7 @@ class CustomRCNN(GeneralizedRCNN):
             self.num_classes = kwargs.pop('num_classes')
             self.num_sample_cats = kwargs.pop('num_sample_cats')
         super().__init__(**kwargs)
-        assert self.proposal_generator is not None
-        if self.cfg.MODEL.SAVE_PROPOSALS:
-            os.makedirs(self.cfg.SAVE_DEBUG_PATH, exist_ok=True)
+        # assert self.proposal_generator is not None
 
     @classmethod
     def from_config(cls, cfg):
@@ -79,15 +77,14 @@ class CustomRCNN(GeneralizedRCNN):
 
         images = self.preprocess_image(batched_inputs)
         features = self.backbone(images.tensor)
-        proposals, _ = self.proposal_generator(images, features, None)
+
+        if self.proposal_generator is not None:
+            proposals, _ = self.proposal_generator(images, features, None)
+        else:
+            assert "proposals" in batched_inputs[0]
+            proposals = [x["proposals"].to(self.device) for x in batched_inputs]
+
         results, _ = self.roi_heads(images, features, proposals)
-        if self.cfg.MODEL.SAVE_PROPOSALS:
-            image_proposals = process_proposals(batched_inputs, images, proposals)
-            for img_p in image_proposals:
-                file_name = img_p['file_name']
-                with open(os.path.join(self.cfg.SAVE_DEBUG_PATH,
-                                       file_name.split('.')[0] + '.json'), 'w') as f:
-                    json.dump(img_p, f)
         if do_postprocess:
             assert not torch.jit.is_scripting(), \
                 "Scripting is not supported for postprocess."
