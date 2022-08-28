@@ -1,5 +1,5 @@
 MODEL:
-  META_ARCHITECTURE: "CustomProposalNetwork"
+  META_ARCHITECTURE: "ProposalNetwork"
   RPN:
     PRE_NMS_TOPK_TEST: 6000
     POST_NMS_TOPK_TEST: 1000
