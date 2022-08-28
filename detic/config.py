@@ -206,3 +206,5 @@ def add_detic_config(cfg):
     _C.CONTEXT_MODELLING.DETACH_THR = 0.7
     _C.CONTEXT_MODELLING.PROPOSALS = ''   # todo: load it at data_mapper
     _C.CONTEXT_MODELLING.ADD_GT = True
+
+    _C.MODEL.ROI_BOX_HEAD.NO_REG = False

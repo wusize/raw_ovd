@@ -378,6 +378,9 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         predictions = dict()
         predictions.update(pseudo_words=self.pred_words(x))
         predictions.update(scores=self.pred_cls_score(predictions['pseudo_words']))
-        predictions.update(proposal_deltas=self.bbox_pred(x))
+        deltas = self.bbox_pred(x)
+        if not self.training and self.cfg.ROI_BOX_HEAD.NO_REG:
+            deltas = deltas * 0.0
+        predictions.update(proposal_deltas=deltas)
 
         return predictions
