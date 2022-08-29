@@ -101,6 +101,7 @@ class ContextModellingV3(ContextModelling):
         storage.put_scalar('loss_statistics/box_type/base_ave_loss', base_ave_loss)
         storage.put_scalar('loss_statistics/box_type/background_ave_loss', background_ave_loss)
 
+        storage.put_histogram('loss_statistics/histogram', loss.cpu())
 
         num_novel = has_novel.sum().cpu().numpy()
         num_base = has_base.sum().cpu().numpy()
