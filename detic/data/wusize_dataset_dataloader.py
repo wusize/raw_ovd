@@ -59,7 +59,7 @@ def transform_proposals(dataset_dict, image_shape, transforms, *, proposal_topk,
         if 'proposal_is_novel' in dataset_dict:
             proposal_is_novel = torch.as_tensor(
                 dataset_dict.pop("proposal_is_novel").astype("int"))
-            proposals.is_novel = proposal_is_novel[:proposal_topk]
+            proposals.is_novel = proposal_is_novel[keep][:proposal_topk]
         dataset_dict["proposals"] = proposals
 
 
