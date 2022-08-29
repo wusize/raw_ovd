@@ -2,7 +2,7 @@
 from .modeling.meta_arch import custom_rcnn
 from .modeling.meta_arch.proposal_network import CustomProposalNetwork
 from .modeling.roi_heads import detic_roi_heads
-from .modeling.roi_heads import res5_roi_heads, standard_roi_heads, standard_roi_heads_v2
+from .modeling.roi_heads import res5_roi_heads, standard_roi_heads, standard_roi_heads_v2, standard_roi_heads_v3
 from .modeling.backbone import swintransformer
 from .modeling.backbone import timm
 from .modeling.rpn.custom_rpn import CustomRPN
