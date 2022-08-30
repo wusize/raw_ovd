@@ -210,3 +210,4 @@ def add_detic_config(cfg):
     _C.CONTEXT_MODELLING.MATCH_IOU_THR = 0.3
 
     _C.MODEL.ROI_BOX_HEAD.NO_REG = False
+    _C.SAVE_PREDICTIONS = True
