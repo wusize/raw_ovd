@@ -78,7 +78,7 @@ class CustomRCNN(GeneralizedRCNN):
         images = self.preprocess_image(batched_inputs)
         features = self.backbone(images.tensor)
 
-        if self.proposal_generator is not None:
+        if self.proposal_generator is not None:    # ignore proposals in input
             proposals, _ = self.proposal_generator(images, features, None)
         else:
             assert "proposals" in batched_inputs[0]
@@ -135,7 +135,10 @@ class CustomRCNN(GeneralizedRCNN):
 
         ann_types = [b.get('ann_type', 'with_instance') for b in batched_inputs]
         image_info = {b['image_id']: dict(captions=b.get('captions', []),
-                                          pos_category_ids=b.get('pos_category_ids', [])) for b in batched_inputs}
+                                          pos_category_ids=b.get('pos_category_ids', []),
+                                          reference_gt=b['proposals'].to(self.device) if 'proposals' in b else None,
+                                          original_size=(b['height'], b['width']))
+                      for b in batched_inputs}
         image_info = OrderedDict(image_info)
         gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
         storage = get_event_storage()

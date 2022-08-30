@@ -49,8 +49,8 @@ from detic.custom_solver import build_custom_optimizer
 from detic.evaluation.oideval import OIDEvaluator
 from detic.evaluation.custom_coco_eval import CustomCOCOEvaluator
 from detic.modeling.utils import reset_cls_test
-
-
+from detic.data.wusize_dataset_dataloader import wusize_build_detection_train_loader
+from detic.data.wusize_dataset_dataloader import WusizeDatasetMapper
 logger = logging.getLogger("detectron2")
 
 def do_test(cfg, model):
@@ -129,12 +129,12 @@ def do_train(cfg, model, resume=False):
 
     # use_custom_mapper = cfg.MODEL.WITH_IMAGE_LABELS
     # MapperClass = CustomDatasetMapper if use_custom_mapper else DatasetMapper
-    MapperClass = DatasetMapper
+    MapperClass = WusizeDatasetMapper
     mapper = MapperClass(cfg, True) if cfg.INPUT.CUSTOM_AUG == '' else \
         DetrDatasetMapper(cfg, True) if cfg.INPUT.CUSTOM_AUG == 'DETR' else \
         MapperClass(cfg, True, augmentations=build_custom_augmentation(cfg, True))
     if cfg.DATALOADER.SAMPLER_TRAIN in ['TrainingSampler', 'RepeatFactorTrainingSampler']:
-        data_loader = build_detection_train_loader(cfg, mapper=mapper)
+        data_loader = wusize_build_detection_train_loader(cfg, mapper=mapper)
     else:
         data_loader = build_custom_train_loader(cfg, mapper=mapper)
 
