@@ -39,46 +39,6 @@ class ContextModellingV1(ContextModellingV3):
 
         return torch.cat(denormalized_boxes), None
 
-    @torch.no_grad()
-    def _bbox_clip_image(self, spanned_boxes, clip_images,
-                         seqs_split_by_group,
-                         normed_boxes_split_by_perms,
-                         clip_model):
-        # TODO: repeat and mask
-        num_groups_per_image = [b.shape[0] for b in spanned_boxes]
-        clip_input_size = self.cfg.INPUT_RESOLUTION
-        spanned_box_crops = roi_align(
-            clip_images.tensor, spanned_boxes, (clip_input_size, clip_input_size), 1.0, 2, True)
-        spanned_box_crops = spanned_box_crops.split(num_groups_per_image, dim=0)
-        storage = get_event_storage()
-        tik = time()
-        spanned_box_crops, attn_masks = multi_apply(repeat_crops_and_get_att_mask,
-                                                    spanned_box_crops, seqs_split_by_group,
-                                                    normed_boxes_split_by_perms,
-                                                    num_heads=clip_model.visual.num_heads,
-                                                    grid_size=clip_input_size // 32)
-        storage.put_scalar("contrast_learning_time/generate_attn_mask",
-                           np.float32(time() - tik))
-        spanned_box_crops = torch.cat(spanned_box_crops, dim=0)
-        # TODO crop features on spanned_box_crops
-        attn_masks = torch.cat(attn_masks, dim=0)
-        clip_img_features = clip_model.encode_image(
-            spanned_box_crops, normalize=True, return_image_tokens=False, attn_masks=attn_masks)
-
-        denormalized_boxes, _ = multi_apply(self.denormalize_boxes_single_image,
-                                            spanned_boxes,
-                                            normed_boxes_split_by_perms,
-                                            seqs_split_by_group)
-        box_crops = roi_align(
-            clip_images.tensor, denormalized_boxes, (clip_input_size, clip_input_size), 1.0, 2, True)
-        if self.checkboard_cfg.LOCAL_CORRESPONDENCE:
-            clip_patch_features = clip_model.encode_image(
-                box_crops, normalize=True, return_image_tokens=False, attn_masks=None).float()
-        else:
-            clip_patch_features = None
-
-        return clip_img_features.float(), clip_patch_features
-
     def _get_clip_word_features(self, pseudo_words, word_mask, clip_model):
         word_mask = word_mask.half()
         start_end_mask = torch.ones_like(word_mask[:, :1])
@@ -147,10 +107,10 @@ class ContextModellingV1(ContextModellingV3):
                                               text_pe=True, normalize=True,
                                               return_word_tokens=False)
             clip_text_features = clip_text_features.float()
-            clip_image_features, clip_patch_features = self._bbox_clip_image(spanned_boxes, clip_images,
-                                                                             seqs_split_by_group,
-                                                                             normed_boxes_split_by_perms,
-                                                                             clip_model)
+            clip_image_features, clip_image_tokens = self._bbox_clip_image(spanned_boxes, clip_images,
+                                                                           seqs_split_by_group,
+                                                                           normed_boxes_split_by_perms,
+                                                                           clip_model)
         tik = time()
         storage.put_scalar("contrast_learning_time/clip_model_forward",
                            np.float32(tik-tok))
@@ -190,9 +150,9 @@ class ContextModellingV1(ContextModellingV3):
         losses = dict(contrast_loss=loss * self.cfg.CONTRAST_LOSS_WEIGHT)
         # Enqueue
         queues_update = dict(clip_text_features=torch.cat([clip_text_features,
-                                                      img_ids.view(-1, 1)], dim=-1).detach(),
+                                                           img_ids.view(-1, 1)], dim=-1).detach(),
                              clip_image_features=torch.cat([clip_image_features,
-                                                      img_ids.view(-1, 1)], dim=-1).detach()
+                                                            img_ids.view(-1, 1)], dim=-1).detach()
                              )
 
         # self.debug(image_info, group_info, similarity_matrix_0, similarity_matrix_1)
@@ -206,6 +166,11 @@ class ContextModellingV1(ContextModellingV3):
                        for b, img_id in zip(preds_split_by_batch,
                                             image_info.keys())]
             img_ids = torch.cat(img_ids).to(device)
+            normed_boxes = torch.cat(normed_boxes, dim=0).split(preds_split_by_perms, dim=0)
+            clip_patch_features = F.normalize(roi_align(
+                clip_image_tokens, normed_boxes, (1, 1),
+                float(clip_image_tokens.shape[-1]), 2, True)[..., 0, 0], dim=-1)
+
             tok = time()
             storage.put_scalar("contrast_learning_time/prepare_dense_features",
                                np.float32(tok - tik))
