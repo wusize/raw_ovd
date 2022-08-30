@@ -66,7 +66,7 @@ def do_test(cfg, model):
                 cfg, False, augmentations=build_custom_augmentation(cfg, False))
         data_loader = build_detection_test_loader(cfg, dataset_name, mapper=mapper)
         output_folder = os.path.join(
-            cfg.OUTPUT_DIR, "inference_{}".format(dataset_name))
+            cfg.OUTPUT_DIR, "inference_{}".format(dataset_name)) if cfg.SAVE_PREDICTIONS else None
         evaluator_type = MetadataCatalog.get(dataset_name).evaluator_type
 
         if evaluator_type == "lvis" or cfg.GEN_PSEDO_LABELS:
