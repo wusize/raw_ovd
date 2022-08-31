@@ -15,6 +15,7 @@ from ..utils import load_class_freq, get_fed_loss_inds
 from .zero_shot_classifier import ZeroShotClassifier
 from detic.modeling import clip as CLIP
 import numpy as np
+from detectron2.utils.events import get_event_storage
 
 __all__ = ["DeticFastRCNNOutputLayers"]
 
@@ -377,6 +378,9 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         score = score * self.word_embedding_cfg.TEMPERATURE
         if self.training or self.word_embedding_cfg.METRIC in ['n1', 'n2']:
             score = score + self.bias
+        if self.training and not self.word_embedding_cfg.FIX_BIAS:
+            storage = get_event_storage()
+            storage.put_scalar('word_embeddings/cls_bias', self.bias.data.detach().cpu().numpy())
 
         return score
 
