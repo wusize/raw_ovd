@@ -365,6 +365,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             pseudo_words = pseudo_words.mean(1)
         if self.word_embedding_cfg.METRIC == 'cosine':
             gt_word_embeddings = F.normalize(gt_word_embeddings, dim=-1)
+            pseudo_words = F.normalize(pseudo_words, dim=-1)
             score = pseudo_words @ gt_word_embeddings.T
         elif self.word_embedding_cfg.METRIC == 'n1':
             dist = (pseudo_words[:, None] - gt_word_embeddings[None]).norm(p=1, dim=-1)
