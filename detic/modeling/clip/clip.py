@@ -24,7 +24,7 @@ if packaging.version.parse(torch.__version__) < packaging.version.parse("1.7.1")
     warnings.warn("PyTorch version 1.7.1 or higher is recommended")
 
 
-__all__ = ["available_models", "load", "tokenize", "tokenize_dynamic"]
+__all__ = ["available_models", "load", "tokenize", "tokenize_dynamic", "get_tokens"]
 _tokenizer = _Tokenizer()
 
 _MODELS = {
@@ -258,3 +258,12 @@ def tokenize_dynamic(texts, context_length: int = 77, truncate: bool = False):
         result[i, :len(tokens)] = torch.tensor(tokens)
 
     return result
+
+
+def get_tokens(texts: Union[str, List[str]]):
+    if isinstance(texts, str):
+        texts = [texts]
+
+    all_tokens = [_tokenizer.encode(text) for text in texts]
+
+    return all_tokens

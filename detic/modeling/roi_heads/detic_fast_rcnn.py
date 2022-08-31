@@ -14,6 +14,7 @@ from torch.cuda.amp import autocast
 from ..utils import load_class_freq, get_fed_loss_inds
 from .zero_shot_classifier import ZeroShotClassifier
 from detic.modeling import clip as CLIP
+import numpy as np
 
 __all__ = ["DeticFastRCNNOutputLayers"]
 
@@ -102,6 +103,20 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         nn.init.constant_(self.bbox_pred[-1].bias, 0)
 
         self.word_dropout = self.cfg.MODEL.ROI_BOX_HEAD.RANDOM_DROPOUT
+
+        self.word_embedding_cfg = self.cfg.WORD_EMBEDDINGS
+        if self.word_embedding_cfg.ENABLE:
+            word_embeddings = np.load(self.word_embedding_cfg.PATH)
+            word_embeddings = torch.from_numpy(word_embeddings)
+            word_embeddings = torch.cat(
+                [word_embeddings, word_embeddings.new_zeros((1, word_embeddings.shape[1]))],
+                dim=0)
+            self.register_buffer('word_embeddings', word_embeddings)
+            bias = self.word_embedding_cfg.BIAS
+            if self.word_embedding_cfg.FIX_BIAS:
+                self.bias = bias
+            else:
+                self.bias = nn.Parameter(torch.tensor(bias))
 
     @classmethod
     def from_config(cls, cfg, input_shape):
@@ -307,18 +322,11 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         # scores, _ = predictions
         scores = predictions.pop('scores')
         num_inst_per_image = [len(p) for p in proposals]
-        if self.cfg.MODEL.ROI_BOX_HEAD.COSINE_SCORE:
-            probs = scores / self.cls_score.norm_temperature
-            w = (self.freq_weight.view(-1) > 1e-4).float()   # base
-            b = (1.0 - w) * self.cfg.MODEL.ROI_BOX_HEAD.NOVEL_BIAS  # novel
-            t = w + (1.0 - w) * self.cfg.MODEL.ROI_BOX_HEAD.NOVEL_TEMP  # novel
-            probs[:, :-1] *= t.view(1, -1)
-            probs[:, :-1] += b.view(1, -1)
+
+        if self.use_sigmoid_ce:
+            probs = scores.sigmoid()
         else:
-            if self.use_sigmoid_ce:
-                probs = scores.sigmoid()
-            else:
-                probs = F.softmax(scores, dim=-1)
+            probs = F.softmax(scores, dim=-1)
         return probs.split(num_inst_per_image, dim=0)
 
     def pre_forward(self, x):
@@ -351,10 +359,29 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
 
         return valid_mask
 
-    def pred_cls_score(self, pseudo_words, **kwargs):
+    def cal_score_by_word_embeddings(self, pseudo_words):
+        gt_word_embeddings = self.word_embeddings
+        if pseudo_words.ndim == 3:
+            pseudo_words = pseudo_words.mean(1)
+        if self.word_embedding_cfg.METRIC == 'cosine':
+            gt_word_embeddings = F.normalize(gt_word_embeddings, dim=-1)
+            score = pseudo_words @ gt_word_embeddings.T
+        elif self.word_embedding_cfg.METRIC == 'n1':
+            dist = (pseudo_words[:, None] - gt_word_embeddings[None]).norm(p=1, dim=-1)
+            score = 1.0 - dist
+        elif self.word_embedding_cfg.METRIC == 'n2':
+            dist = (pseudo_words[:, None] - gt_word_embeddings[None]).norm(p=2, dim=-1)
+            score = 1.0 - dist
+        else:
+            raise NotImplementedError(f'{self.word_embedding_cfg.METRIC} not supported')
+        score = score * self.word_embedding_cfg.TEMPERATURE
+        if self.training:
+            score = score + self.word_embedding_cfg.BIAS
+
+        return score
+
+    def cal_score_by_clip_text_encoder(self, pseudo_words):
         clip_model = self.clip
-        if pseudo_words.shape[0] == 0:
-            return pseudo_words.new_zeros(0, self.num_classes + 1)
         clip_model.eval()
         with autocast():
             if self.word_dropout > 0.0:
@@ -370,6 +397,17 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
 
         cls_scores = self.cls_score(cls_features)
         return cls_scores
+
+    def pred_cls_score(self, pseudo_words, **kwargs):
+        if pseudo_words.shape[0] == 0:
+            return pseudo_words.new_zeros(0, self.num_classes + 1)
+        if self.word_embedding_cfg.ENABLE:
+            if self.training and self.word_embedding_cfg.ONLY_TEST:
+                return self.cal_score_by_clip_text_encoder(pseudo_words)
+            else:
+                return self.cal_score_by_word_embeddings(pseudo_words)
+        else:
+            return self.cal_score_by_clip_text_encoder(pseudo_words)
 
     def forward(self, x):
         x = self.pre_forward(x)
