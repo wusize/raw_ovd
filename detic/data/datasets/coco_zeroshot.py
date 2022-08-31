@@ -98,7 +98,7 @@ _PREDEFINED_SPLITS_COCO = {
     "coco_zeroshot_train": ("coco/train2017", "coco/zero-shot/instances_train2017_seen_2.json", 'seen'),
     "coco_zeroshot_val": ("coco/val2017", "coco/zero-shot/instances_val2017.json", 'all'),
     "coco_sampled_train": ("coco/train2017", "coco/zero-shot/instances_train2017_5000.json", 'all'),
-    "coco_not_zeroshot_val": ("coco/val2017", "coco/zero-shot/instances_val2017_seen_2.json", 'seen'),
+    "coco_not_zeroshot_val": ("coco/val2017", "coco/zero-shot/instances_val2017_base.json", 'all'),
     "coco_unseen_train": ("coco/train2017", "coco/annotations/instances_train2017_rare.json", 'all'),
     "coco_generalized_zeroshot_val": ("coco/val2017", "coco/zero-shot/instances_val2017_all_2_oriorder.json", 'all'),
     "coco_zeroshot_train_oriorder": ("coco/train2017",
