@@ -368,10 +368,10 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             score = pseudo_words @ gt_word_embeddings.T
         elif self.word_embedding_cfg.METRIC == 'n1':
             dist = (pseudo_words[:, None] - gt_word_embeddings[None]).norm(p=1, dim=-1)
-            score = 1.0 - dist
+            score = - dist
         elif self.word_embedding_cfg.METRIC == 'n2':
             dist = (pseudo_words[:, None] - gt_word_embeddings[None]).norm(p=2, dim=-1)
-            score = 1.0 - dist
+            score = - dist
         else:
             raise NotImplementedError(f'{self.word_embedding_cfg.METRIC} not supported')
         score = score * self.word_embedding_cfg.TEMPERATURE
