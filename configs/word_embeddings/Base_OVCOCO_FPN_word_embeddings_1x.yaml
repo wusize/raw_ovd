@@ -39,6 +39,10 @@ MODEL:
     WORD_EMBED_DIM: 512
     CLS_LOSS_WEIGHT: 1.0
     WORD_EMBEDDINGS:
+      TEMPERATURE: 25.0
+      ONLY_TEST: False
+      BIAS: -20.0
+      FIX_BIAS: False
       ENABLE: True
       PATH: 'datasets/metadata/coco_clip_word_embeddings.npy'
   CLIP:

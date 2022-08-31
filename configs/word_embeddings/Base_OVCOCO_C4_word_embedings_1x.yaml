@@ -25,6 +25,10 @@ MODEL:
     CLS_LOSS_WEIGHT: 1.0
     WORD_EMBEDDINGS:
       ENABLE: True
+      TEMPERATURE: 25.0
+      ONLY_TEST: False
+      BIAS: -20.0
+      FIX_BIAS: False
       PATH: 'datasets/metadata/coco_clip_word_embeddings.npy'
   CLIP:
     NAME: 'ViT-B/32'

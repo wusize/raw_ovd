@@ -377,7 +377,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             raise NotImplementedError(f'{self.word_embedding_cfg.METRIC} not supported')
         score = score * self.word_embedding_cfg.TEMPERATURE
         if self.training:
-            score = score + self.word_embedding_cfg.BIAS
+            score = score + self.bias
 
         return score
 
