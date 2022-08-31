@@ -4,6 +4,7 @@ from .utils import multi_apply
 from .context_modelling import ContextModelling
 from detectron2.structures import Instances, Boxes, PolygonMasks
 from detectron2.modeling.poolers import assign_boxes_to_levels
+from torchvision.ops import nms
 
 
 class ContextModellingV4(ContextModelling):
@@ -57,6 +58,10 @@ class ContextModellingV4(ContextModelling):
             lvl_proposals.sample_types[:] = 1    # clip_kd_samples: 1
             multi_level_instances.append(lvl_proposals)
         sampled_proposals = Instances.cat(multi_level_instances)
+        nms_kept = nms(sampled_proposals.proposal_boxes.tensor,
+                       scores=sampled_proposals.objectness_logits,
+                       iou_threshold=max(self.checkboard_cfg.NMS_THR))
+        sampled_proposals = sampled_proposals[nms_kept]
         func = self.checkboard_sampling.sample
         boxes = sampled_proposals.proposal_boxes.tensor.tolist()
         groups_per_proposal, normed_boxes, spanned_boxes, box_ids = \
