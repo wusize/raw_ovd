@@ -361,8 +361,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
 
     def cal_score_by_word_embeddings(self, pseudo_words):
         gt_word_embeddings = self.word_embeddings
-        if pseudo_words.ndim == 3:
-            pseudo_words = pseudo_words.mean(1)
+        pseudo_words = self.process_multiple_words(pseudo_words)
         if self.word_embedding_cfg.METRIC == 'cosine':
             gt_word_embeddings = F.normalize(gt_word_embeddings, dim=-1)
             pseudo_words = F.normalize(pseudo_words, dim=-1)
@@ -398,6 +397,23 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
 
         cls_scores = self.cls_score(cls_features)
         return cls_scores
+
+    def process_multiple_words(self, pseudo_words):
+        if not self.training:
+            return pseudo_words.mean(1)
+        else:
+            p = self.word_dropout
+            num_preds, num_words, _ = pseudo_words.shape
+            mask = F.dropout(pseudo_words.new_ones(num_preds, num_words),
+                             p=p,
+                             training=self.training)
+            # check empty
+            is_empty = mask.sum(dim=-1) == 0.0
+            mask[is_empty, 0] = 1.0  # TODO add random on this
+            mask[mask > 0.0] = 1.0    # 0.0 and 1.0
+            pseudo_words = (pseudo_words * mask[..., None]).sum(1) / mask.sum(dim=1, keepdim=True)
+
+            return pseudo_words
 
     def pred_cls_score(self, pseudo_words, **kwargs):
         if pseudo_words.shape[0] == 0:
