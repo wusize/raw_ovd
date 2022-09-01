@@ -100,15 +100,6 @@ class ContextModelling(nn.Module):
             self.bce_bias = nn.Parameter(torch.tensor(0.0))
 
             self.queues = Queues(queue_cfg=self.cfg.QUEUE)
-            self.prompting_cfg = self.cfg.PROMPTING
-            if self.prompting_cfg.ENABLE:
-                from detic.context_modelling.prompting import Prompting
-                self.prompt = Prompting(num_words=self.prompting_cfg.NUM_WORDS,
-                                        word_dims=word_embed_dim)
-                if self.prompting_cfg.POSITION_AWARE:
-                    from detic.context_modelling.prompting import SinePositionalEncoding
-                    self.positional_embedding = SinePositionalEncoding(
-                        num_words=self.prompting_cfg.NUM_WORDS, word_dims=word_embed_dim)
 
     # preprocess topk proposals
     def preprocess_proposals(self, proposals, shape_ratio_thr, area_ratio_thr, objectness_thr, nms_thr):
