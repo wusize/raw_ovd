@@ -104,7 +104,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         nn.init.constant_(self.bbox_pred[-1].bias, 0)
 
         self.word_dropout = self.cfg.MODEL.ROI_BOX_HEAD.RANDOM_DROPOUT
-
+        self.word_embedding_cfg = self.cfg.WORD_EMBEDDINGS
         if self.word_embedding_cfg.ENABLE:
             word_embeddings = np.load(self.word_embedding_cfg.PATH)
             word_embeddings = torch.from_numpy(word_embeddings)
