@@ -398,7 +398,7 @@ class ContextModelling(nn.Module):
                 context_length=context_length + 2)  # add start and stop token
             clip_text_features, clip_word_tokens = \
                 clip_model.encode_pseudo_text(pseudo_text, end_token_ids,
-                                              text_pe=True, normalize=True,
+                                              text_pe=False, normalize=True,
                                               return_word_tokens=True)
             clip_text_features = clip_text_features.float()
             clip_image_features, clip_image_tokens = self._bbox_clip_image(spanned_boxes, clip_images,

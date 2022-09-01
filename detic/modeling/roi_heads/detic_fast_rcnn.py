@@ -113,11 +113,6 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
                 [word_embeddings, word_embeddings.new_zeros((1, word_embeddings.shape[1]))],
                 dim=0)
             self.register_buffer('word_embeddings', word_embeddings)
-            bias = self.word_embedding_cfg.BIAS
-            if self.word_embedding_cfg.FIX_BIAS:
-                self.bias = bias
-            else:
-                self.bias = nn.Parameter(torch.tensor(bias))
 
     @classmethod
     def from_config(cls, cfg, input_shape):
@@ -178,12 +173,27 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         else:
             loss_cls = self.softmax_cross_entropy_loss(scores, gt_classes)
         losses = {
-            "loss_cls": loss_cls, 
+            "loss_cls": loss_cls,
             "loss_box_reg": self.box_reg_loss(
-                proposal_boxes, gt_boxes, proposal_deltas, gt_classes, 
+                proposal_boxes, gt_boxes, proposal_deltas, gt_classes,
                 num_classes=num_classes)
         }
-        return {k: v * self.loss_weight.get(k, 1.0) for k, v in losses.items()}
+        losses = {k: v * self.loss_weight.get(k, 1.0) for k, v in losses.items()}
+
+        if "cls_pseudo_words" in predictions and self.word_embedding_cfg.ENABLE:
+            # add auxiliary norm loss
+            aux_loss_weight = self.word_embedding_cfg.WEIGHT
+            positive_samples = gt_classes < self.num_classes
+            if positive_samples.sum() == 0:
+                loss_cls_aux = loss_cls * 0.0
+            else:
+                cls_pseudo_words = predictions['cls_pseudo_words'][positive_samples].mean(1)
+                gt_words = self.word_embeddings[gt_classes[positive_samples]]
+                loss_cls_aux = aux_loss_weight * (cls_pseudo_words - gt_words).norm(dim=-1, p=1).mean()
+
+            losses.update(loss_cls_aux=loss_cls_aux)
+
+        return losses
 
     def sigmoid_cross_entropy_loss(self, pred_class_logits, gt_classes):
         if pred_class_logits.numel() == 0:
@@ -352,15 +362,16 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         is_empty = mask.sum(dim=-1) == 0.0
         mask[is_empty, 0] = 1.0       # TODO add random on this
         mask[mask > 0.0] = 1.0
-        if self.training:             # TODO discard this
-            is_full = (mask > 0.0).sum(dim=-1) == num_words
-            mask[is_full, -1] = 0.0
+        # if self.training:             # TODO discard this
+        #     is_full = (mask > 0.0).sum(dim=-1) == num_words
+        #     mask[is_full, -1] = 0.0
         # add start and end token mask
         valid_mask = torch.cat([start_end_mask, mask, start_end_mask], dim=-1)
 
         return valid_mask
 
     def cal_score_by_word_embeddings(self, pseudo_words):
+        assert not self.training
         gt_word_embeddings = self.word_embeddings
         pseudo_words = self.process_multiple_words(pseudo_words)
         if self.word_embedding_cfg.METRIC == 'cosine':
@@ -376,11 +387,8 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         else:
             raise NotImplementedError(f'{self.word_embedding_cfg.METRIC} not supported')
         score = score * self.word_embedding_cfg.TEMPERATURE
-        if self.training or self.word_embedding_cfg.METRIC in ['n1', 'n2']:
-            score = score + self.bias
-        if self.training and not self.word_embedding_cfg.FIX_BIAS:
-            storage = get_event_storage()
-            storage.put_scalar('word_embeddings/cls_bias', self.bias.data.detach().cpu().numpy())
+        if self.word_embedding_cfg.METRIC in ['n1', 'n2']:
+            score = score + self.word_embedding_cfg.BIAS
 
         return score
 
@@ -393,10 +401,9 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             pseudo_text, end_token_ids = clip_model.prepare_pseudo_text_tensor(
                 pseudo_words.half(), valid_mask)  # add start and stop token
             # assert attn_mask.shape[:2] == pseudo_words.shape[:2]
-            cls_features, x, end_token_ids = \
-                clip_model.encode_pseudo_text_endk(pseudo_text, end_token_ids,
-                                                   text_pe=True,
-                                                   stepk=12, normalize=True)
+            cls_features = \
+                clip_model.encode_pseudo_text(pseudo_text, end_token_ids,
+                                              text_pe=True, normalize=True)
             cls_features = cls_features.float()
 
         cls_scores = self.cls_score(cls_features)
@@ -422,11 +429,9 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
     def pred_cls_score(self, pseudo_words, **kwargs):
         if pseudo_words.shape[0] == 0:
             return pseudo_words.new_zeros(0, self.num_classes + 1)
-        if self.word_embedding_cfg.ENABLE:
-            if self.training and self.word_embedding_cfg.ONLY_TEST:
-                return self.cal_score_by_clip_text_encoder(pseudo_words)
-            else:
-                return self.cal_score_by_word_embeddings(pseudo_words)
+
+        if not self.training and (self.word_embedding_cfg.ENABLE and self.word_embedding_cfg.TEST):
+            return self.cal_score_by_word_embeddings(pseudo_words)
         else:
             return self.cal_score_by_clip_text_encoder(pseudo_words)
 

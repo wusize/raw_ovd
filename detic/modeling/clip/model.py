@@ -568,7 +568,7 @@ class CLIP(nn.Module):
         else:
             for i in range(x.shape[0]):
                 x[i, end_token_ids[i]:] = x[i, end_token_ids[i]:] + self.positional_embedding.type(
-                    self.dtype)[end_token_ids[i]:]
+                    self.dtype)[end_token_ids[i]:x.shape[1]]
                 x[i, 0] = x[i, 0] + self.positional_embedding.type(self.dtype)[0]
 
         x = x.permute(1, 0, 2)  # NLD -> LND

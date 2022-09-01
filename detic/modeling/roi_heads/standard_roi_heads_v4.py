@@ -165,26 +165,8 @@ class CustomStandardROIHeadsV4(StandardROIHeads):
     def _box_forward_train(self, box_features, proposals, targets):
         input_box_features = self.box_predictor.pre_forward(box_features)
         del box_features
-        pseudo_words_ = self.box_predictor.pred_words(input_box_features)
+        pseudo_words = self.box_predictor.pred_words(input_box_features)
         sample_types = torch.cat([p.sample_types for p in proposals], dim=0)
-
-        # TODO: detach base words for context modelling
-        if self.context_modeling_cfg.DETACH_BASE:
-            iou_with_gt_base = [box_iou(p.proposal_boxes.tensor,
-                                        t.gt_boxes.tensor).max(-1).values
-                                if len(t) > 0
-                                else
-                                p.proposal_boxes.tensor.new_zeros(len(p))
-                                for p, t in zip(proposals, targets)
-                                ]
-            iou_with_gt_base = torch.cat(iou_with_gt_base)
-            pseudo_words = torch.zeros_like(pseudo_words_)
-            need_detach = torch.logical_and(sample_types > 0,
-                                            iou_with_gt_base > self.context_modeling_cfg.DETACH_THR)
-            pseudo_words[need_detach] = pseudo_words_[need_detach].detach()
-            pseudo_words[need_detach.logical_not()] = pseudo_words_[need_detach.logical_not()]
-        else:
-            pseudo_words = pseudo_words_
 
         storage = get_event_storage()
         tik = time()
@@ -192,7 +174,8 @@ class CustomStandardROIHeadsV4(StandardROIHeads):
         storage.put_scalar('time/pred_cls', time() - tik)
         proposal_deltas = self.box_predictor.bbox_pred(input_box_features[sample_types == 0])
         del input_box_features
-        predictions = dict(kd_pseudo_words=pseudo_words[sample_types == 1],
+        predictions = dict(cls_pseudo_words=pseudo_words[sample_types == 0],
+                           kd_pseudo_words=pseudo_words[sample_types == 1],
                            caption_pseudo_words=pseudo_words[sample_types == 2],
                            scores=scores,
                            proposal_deltas=proposal_deltas)
