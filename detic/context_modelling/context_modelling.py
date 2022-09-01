@@ -285,7 +285,7 @@ class ContextModelling(nn.Module):
             prompts = self.prompt(pseudo_words)
             if self.prompting_cfg.POSITION_AWARE:
                 prompts = prompts + self.positional_embedding(positions)
-            prompt_masks = torch.ones_like(prompts[..., 0])
+            prompt_masks = torch.ones_like(prompts[..., 0]) > 0.0
             pseudo_words = torch.cat([prompts, pseudo_words], dim=1)
             word_masks = torch.cat([prompt_masks, word_masks], dim=1)
         return pseudo_words, word_masks
