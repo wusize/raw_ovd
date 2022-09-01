@@ -64,7 +64,8 @@ class CustomStandardROIHeadsV3(StandardROIHeads):
             if self.context_modeling_cfg.ENABLE:
                 losses.update(self.context_modeling.get_loss(group_infos,
                                                              predictions, clip_images,
-                                                             self.box_predictor.clip, image_info))
+                                                             self.box_predictor.clip, image_info,
+                                                             self.box_predictor.positional_encoder))
                 storage.put_scalar("time/contrast_learning", np.float32(time() - tok))
 
             if self.cfg.MODEL.WITH_IMAGE_LABELS:

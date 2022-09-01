@@ -321,7 +321,8 @@ class ContextModelling(nn.Module):
                          group_info,
                          predictions, clip_images,
                          clip_model,
-                         image_info=None):
+                         image_info=None,
+                         positional_encoder=None):
         pseudo_words = predictions.pop('kd_pseudo_words')
         device = pseudo_words.device
         storage = get_event_storage()
@@ -330,12 +331,10 @@ class ContextModelling(nn.Module):
         normed_boxes, spanned_boxes, origin_split, group_split, preds_split_by_perms,\
             seqs_split_split_by_origin, seqs_split_by_group = \
             multi_apply(process_single_image_groups, group_info, device=device)
-        # positions = bbox_xyxy_to_cxcywh(torch.cat(normed_boxes, dim=0))
-        # position_embeddings = self.positional_embed(positions)
-        # pseudo_words = pseudo_words + position_embeddings
+        positions = bbox_xyxy_to_cxcywh(torch.cat(normed_boxes, dim=0))
+        position_embeddings = positional_encoder(positions)
+        pseudo_words = pseudo_words + position_embeddings
         word_masks = self._drop_word(pseudo_words)
-        pseudo_words, word_masks = self._add_prompting(pseudo_words, word_masks,
-                                                       bbox_xyxy_to_cxcywh(torch.cat(normed_boxes, dim=0)))
         start_id = 0
         seq_ids = []
         for g in group_info:
@@ -603,21 +602,16 @@ class ContextModelling(nn.Module):
 
         return dict(caption_loss=loss * self.cfg.CAPTION_LOSS_WEIGHT), queue_update
 
-    def get_loss(self, group_infos, predictions, clip_images, clip_model, image_info):
+    def get_loss(self, group_infos, predictions, clip_images, clip_model, image_info, positional_encoder):
         losses = dict()
         queue_update = dict()
         if self.checkboard_cfg.ENABLE:
             loss_kd, queue_kd = self.kd_clip_contrast([g['checkborad_group_info'] for g in group_infos],
                                                       predictions, clip_images,
-                                                      clip_model, image_info)
+                                                      clip_model, image_info,
+                                                      positional_encoder)
             losses.update(loss_kd)
             queue_update.update(queue_kd)
-
-        if self.caption_cfg.ENABLE:
-            loss_caption, queue_caption = self.caption_contrast([g['caption_normed_boxes'] for g in group_infos],
-                                                                predictions, clip_model, image_info)
-            losses.update(loss_caption)
-            queue_update.update(queue_caption)
 
         self.queues.dequeue_and_enqueue(queue_update)
 

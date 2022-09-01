@@ -16,7 +16,7 @@ from .zero_shot_classifier import ZeroShotClassifier
 from detic.modeling import clip as CLIP
 import numpy as np
 from detectron2.utils.events import get_event_storage
-
+from detic.context_modelling.prompting import SinePositionalEncoding, ZeroPositionalEncoding
 __all__ = ["DeticFastRCNNOutputLayers"]
 
 
@@ -105,7 +105,6 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
 
         self.word_dropout = self.cfg.MODEL.ROI_BOX_HEAD.RANDOM_DROPOUT
 
-        self.word_embedding_cfg = self.cfg.MODEL.ROI_BOX_HEAD.WORD_EMBEDDINGS
         if self.word_embedding_cfg.ENABLE:
             word_embeddings = np.load(self.word_embedding_cfg.PATH)
             word_embeddings = torch.from_numpy(word_embeddings)
@@ -114,11 +113,15 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
                 dim=0)
             self.register_buffer('word_embeddings', word_embeddings)
 
-        self.prompting_cfg = self.cfg.MODEL.ROI_BOX_HEAD.PROMPTING
-        if self.prompting_cfg.ENABLE:
-            from detic.context_modelling.prompting import Prompting
-            self.prompt = Prompting(num_words=self.prompting_cfg.NUM_WORDS,
-                                    word_dims=word_embed_dim)
+        self.pe_cfg = self.cfg.MODEL.ROI_BOX_HEAD.POSITIONAL_ENCODING
+        assert self.pe_cfg.NUM_WORDS == 1 or self.pe_cfg.NUM_WORDS == num_words
+        if self.pe_cfg.ENABLE:
+            self.positional_encoder = SinePositionalEncoding(
+                num_words=self.pe_cfg.NUM_WORDS,
+                word_dims=word_embed_dim)
+        else:
+            self.positional_encoder = ZeroPositionalEncoding(num_words=self.pe_cfg.NUM_WORDS,
+                                                             word_dims=word_embed_dim)
 
     @classmethod
     def from_config(cls, cfg, input_shape):
@@ -398,20 +401,20 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
 
         return score
 
+    def _pseudo_positional_encode(self, pseudo_words):
+        device = pseudo_words.device
+        pseudo_positions = torch.tensor([[0.5, 0.5, 1.0, 1.0]]).to(device)
+        positional_embeddings = self.positional_encoder(pseudo_positions)
+        return pseudo_words + positional_embeddings
+
     def cal_score_by_clip_text_encoder(self, pseudo_words):
+        pseudo_words = self._pseudo_positional_encode(pseudo_words)
         clip_model = self.clip
         clip_model.eval()
         with autocast():
             valid_mask = self._drop_word(pseudo_words.half())
             pseudo_text, end_token_ids = clip_model.prepare_pseudo_text_tensor(
                 pseudo_words.half(), valid_mask)  # add start and stop token
-            # TODO: ADD PROMPTING
-            if self.prompting_cfg.ENABLE:
-                prompts = self.prompt(pseudo_text)
-                pseudo_text = torch.cat([pseudo_text[:, :1],   # start token
-                                         prompts,              # prompts
-                                         pseudo_text[:, 1:]], dim=1)
-                end_token_ids = end_token_ids + self.prompting_cfg.NUM_WORDS    # end_token shift
             # assert attn_mask.shape[:2] == pseudo_words.shape[:2]
             cls_features = \
                 clip_model.encode_pseudo_text(pseudo_text, end_token_ids,

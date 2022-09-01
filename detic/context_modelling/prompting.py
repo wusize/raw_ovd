@@ -3,6 +3,18 @@ import torch.nn as nn
 import math
 
 
+class ZeroPositionalEncoding(nn.Module):
+
+    def __init__(self,
+                 num_words=4,
+                 word_dims=512,):
+        super(ZeroPositionalEncoding, self).__init__()
+        self.num_words = num_words
+        self.word_dims = word_dims
+
+    def forward(self, x):
+
+        return x.new_zeros(x.shape[0], self.num_words, self.word_dims)
 
 class SinePositionalEncoding(nn.Module):
 

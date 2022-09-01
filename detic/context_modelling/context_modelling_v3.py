@@ -137,7 +137,8 @@ class ContextModellingV3(ContextModelling):
                          group_info,
                          predictions, clip_images,
                          clip_model,
-                         image_info=None):
+                         image_info=None,
+                         positional_encoder=None):
         pseudo_words = predictions.pop('kd_pseudo_words')
         device = pseudo_words.device
         storage = get_event_storage()
@@ -146,12 +147,10 @@ class ContextModellingV3(ContextModelling):
         normed_boxes, spanned_boxes, origin_split, group_split, preds_split_by_perms,\
             seqs_split_split_by_origin, seqs_split_by_group = \
             multi_apply(process_single_image_groups, group_info, device=device)
-        # positions = bbox_xyxy_to_cxcywh(torch.cat(normed_boxes, dim=0))
-        # position_embeddings = self.positional_embed(positions)
-        # pseudo_words = pseudo_words + position_embeddings
+        positions = bbox_xyxy_to_cxcywh(torch.cat(normed_boxes, dim=0))
+        position_embeddings = positional_encoder(positions)
+        pseudo_words = pseudo_words + position_embeddings
         word_masks = self._drop_word(pseudo_words)
-        pseudo_words, word_masks = self._add_prompting(pseudo_words, word_masks,
-                                                       bbox_xyxy_to_cxcywh(torch.cat(normed_boxes, dim=0)))
         start_id = 0
         seq_ids = []
         for g in group_info:
