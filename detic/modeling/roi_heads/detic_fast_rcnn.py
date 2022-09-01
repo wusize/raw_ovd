@@ -189,7 +189,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             else:
                 cls_pseudo_words = predictions['cls_pseudo_words'][positive_samples].mean(1)
                 gt_words = self.word_embeddings[gt_classes[positive_samples]]
-                loss_cls_aux = aux_loss_weight * (cls_pseudo_words - gt_words).norm(dim=-1, p=1).mean()
+                loss_cls_aux = aux_loss_weight * (cls_pseudo_words - gt_words).abs().mean()
 
             losses.update(loss_cls_aux=loss_cls_aux)
 
