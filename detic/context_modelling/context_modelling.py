@@ -368,9 +368,9 @@ class ContextModelling(nn.Module):
         normed_boxes, spanned_boxes, origin_split, group_split, preds_split_by_perms,\
             seqs_split_split_by_origin, seqs_split_by_group = \
             multi_apply(process_single_image_groups, group_info, device=device)
-        positions = bbox_xyxy_to_cxcywh(torch.cat(normed_boxes, dim=0))
-        position_embeddings = self.positional_embed(positions)
-        pseudo_words = pseudo_words + position_embeddings
+        # positions = bbox_xyxy_to_cxcywh(torch.cat(normed_boxes, dim=0))
+        # position_embeddings = self.positional_embed(positions)
+        # pseudo_words = pseudo_words + position_embeddings
         word_masks = self._drop_word(pseudo_words)
         start_id = 0
         seq_ids = []
@@ -398,7 +398,7 @@ class ContextModelling(nn.Module):
                 context_length=context_length + 2)  # add start and stop token
             clip_text_features, clip_word_tokens = \
                 clip_model.encode_pseudo_text(pseudo_text, end_token_ids,
-                                              text_pe=False, normalize=True,
+                                              text_pe=True, normalize=True,
                                               return_word_tokens=True)
             clip_text_features = clip_text_features.float()
             clip_image_features, clip_image_tokens = self._bbox_clip_image(spanned_boxes, clip_images,
