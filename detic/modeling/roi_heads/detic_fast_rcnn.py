@@ -114,6 +114,12 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
                 dim=0)
             self.register_buffer('word_embeddings', word_embeddings)
 
+        self.prompting_cfg = self.cfg.MODEL.ROI_BOX_HEAD.PROMPTING
+        if self.prompting_cfg.ENABLE:
+            from detic.context_modelling.prompting import Prompting
+            self.prompt = Prompting(num_words=self.prompting_cfg.NUM_WORDS,
+                                    word_dims=word_embed_dim)
+
     @classmethod
     def from_config(cls, cfg, input_shape):
         ret = super().from_config(cfg, input_shape)
@@ -396,10 +402,16 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         clip_model = self.clip
         clip_model.eval()
         with autocast():
-            if self.word_dropout > 0.0:
-                valid_mask = self._drop_word(pseudo_words.half())
+            valid_mask = self._drop_word(pseudo_words.half())
             pseudo_text, end_token_ids = clip_model.prepare_pseudo_text_tensor(
                 pseudo_words.half(), valid_mask)  # add start and stop token
+            # TODO: ADD PROMPTING
+            if self.prompting_cfg.ENABLE:
+                prompts = self.prompt(pseudo_text)
+                pseudo_text = torch.cat([pseudo_text[:, :1],   # start token
+                                         prompts,              # prompts
+                                         pseudo_text[:, 1:]], dim=1)
+                end_token_ids = end_token_ids + self.prompting_cfg.NUM_WORDS    # end_token shift
             # assert attn_mask.shape[:2] == pseudo_words.shape[:2]
             cls_features = \
                 clip_model.encode_pseudo_text(pseudo_text, end_token_ids,

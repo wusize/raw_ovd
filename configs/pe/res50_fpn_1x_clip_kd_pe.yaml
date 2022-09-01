@@ -1,6 +1,9 @@
 _BASE_: "../Base_OVCOCO_FPN_1x.yaml"
 MODEL:
   ROI_BOX_HEAD:
+    PROMPTING:
+      ENABLE: True
+      NUM_WORDS: 1
     ZEROSHOT_WEIGHT_PATH: 'datasets/metadata/coco_clip_a+cname.npy'
     RANDOM_DROPOUT: 0.5
     NORM_TEMP: 25.0
@@ -11,6 +14,10 @@ MODEL:
     USE_IMAGE_ENCODER: True
   WITH_IMAGE_LABELS: False
 CONTEXT_MODELLING:
+  PROMPTING:
+    ENABLE: True
+    NUM_WORDS: 1
+    POSITION_AWARE: True
   ENABLE: True
   DETACH_BASE: False
   CONTRAST_LOSS_WEIGHT: 0.5

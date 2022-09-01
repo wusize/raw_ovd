@@ -17,6 +17,9 @@ from detic.modeling import clip as CLIP
 from detectron2.structures.masks import PolygonMasks
 
 
+def identity_func(x):
+    return x
+
 def perm_generator(seq):
     seen = set()
     length = len(seq)
@@ -67,59 +70,6 @@ def box_ids2seq_id(box_ids):
     return int(box_ids_str)
 
 
-def identity_func(x):
-    return x
-
-
-class SinePositionalEncoding(nn.Module):
-
-    def __init__(self,
-                 num_feats=128,
-                 num_words=4,
-                 word_dims=512,
-                 temperature=1.2,
-                 scale=2 * math.pi):
-        super(SinePositionalEncoding, self).__init__()
-        self.num_feats = num_feats
-        self.temperature = temperature
-        self.scale = scale
-        self.pos_proj = nn.Sequential(
-            nn.Linear(num_feats * 4, word_dims),
-            nn.LayerNorm(word_dims),
-            nn.Linear(word_dims, num_words * word_dims))
-        self.num_words = num_words
-        self.word_dims = word_dims
-
-    def forward(self, x):
-        embed = x * self.scale
-        dim_t = torch.arange(
-            self.num_feats, dtype=torch.float32, device=x.device)
-        dim_t = self.temperature ** ((dim_t // 2) - (self.num_feats // 4))
-        pos = embed[:, :, None] * dim_t[None, None]
-        pos[..., 0::2] = pos[..., 0::2].sin()
-        pos[..., 1::2] = pos[..., 1::2].cos()
-
-        assert pos.shape[-1] == self.num_feats
-
-        pos = pos.view(-1, 4 * self.num_feats)
-
-        return self.pos_proj(pos).view(-1, self.num_words, self.word_dims)
-
-
-class ZeroPositionalEncoding(nn.Module):
-
-    def __init__(self,
-                 num_words=4,
-                 word_dims=512,):
-        super(ZeroPositionalEncoding, self).__init__()
-        self.num_words = num_words
-        self.word_dims = word_dims
-
-    def forward(self, x):
-
-        return x.new_zeros(x.shape[0], self.num_words, self.word_dims)
-
-
 class ContextModelling(nn.Module):
     def __init__(self, cfg, num_words, word_embed_dim, word_dropout, sigmoid=True):
         super(ContextModelling, self).__init__()
@@ -150,13 +100,15 @@ class ContextModelling(nn.Module):
             self.bce_bias = nn.Parameter(torch.tensor(0.0))
 
             self.queues = Queues(queue_cfg=self.cfg.QUEUE)
-            if self.cfg.POSITIONAL_ENCODING:
-                self.positional_embed = SinePositionalEncoding(num_feats=128,
-                                                               num_words=num_words,
-                                                               word_dims=word_embed_dim)
-            else:
-                self.positional_embed = ZeroPositionalEncoding(num_words=num_words,
-                                                               word_dims=word_embed_dim)
+            self.prompting_cfg = self.cfg.PROMPTING
+            if self.prompting_cfg.ENABLE:
+                from detic.context_modelling.prompting import Prompting
+                self.prompt = Prompting(num_words=self.prompting_cfg.NUM_WORDS,
+                                        word_dims=word_embed_dim)
+                if self.prompting_cfg.POSITION_AWARE:
+                    from detic.context_modelling.prompting import SinePositionalEncoding
+                    self.positional_embedding = SinePositionalEncoding(
+                        num_words=self.prompting_cfg.NUM_WORDS, word_dims=word_embed_dim)
 
     # preprocess topk proposals
     def preprocess_proposals(self, proposals, shape_ratio_thr, area_ratio_thr, objectness_thr, nms_thr):
@@ -328,6 +280,16 @@ class ContextModelling(nn.Module):
 
         return mask
 
+    def _add_prompting(self, pseudo_words, word_masks, positions):
+        if self.prompting_cfg.ENABLE:
+            prompts = self.prompt(pseudo_words)
+            if self.prompting_cfg.POSITION_AWARE:
+                prompts = prompts + self.positional_embedding(positions)
+            prompt_masks = torch.ones_like(prompts[..., 0])
+            pseudo_words = torch.cat([prompts, pseudo_words], dim=1)
+            word_masks = torch.cat([prompt_masks, word_masks], dim=1)
+        return pseudo_words, word_masks
+
     @torch.no_grad()
     def _bbox_clip_image(self, spanned_boxes, clip_images,
                          seqs_split_by_group,
@@ -372,6 +334,8 @@ class ContextModelling(nn.Module):
         # position_embeddings = self.positional_embed(positions)
         # pseudo_words = pseudo_words + position_embeddings
         word_masks = self._drop_word(pseudo_words)
+        pseudo_words, word_masks = self._add_prompting(pseudo_words, word_masks,
+                                                       bbox_xyxy_to_cxcywh(torch.cat(normed_boxes, dim=0)))
         start_id = 0
         seq_ids = []
         for g in group_info:
