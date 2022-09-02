@@ -41,7 +41,7 @@ class ContextModellingV6(ContextModelling):
         prompts = prompts + positional_embeddings
         box_type_embeddings = self.box_type_embeddings[box_types]
         box_type_valid = self.box_type_valid[box_types]
-
+        import pdb; pdb.set_trace()
         prompts = prompts * (1.0 - box_type_valid) + box_type_embeddings * box_type_valid
 
         prompt_masks = torch.ones_like(prompts[..., 0]) > 0.0
