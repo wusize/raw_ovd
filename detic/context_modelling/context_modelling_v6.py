@@ -30,14 +30,15 @@ class ContextModellingV6(ContextModelling):
         embedding_template[:, :saved_length] = box_type_embeddings
         valid_template[:, :saved_length, 0] = valid
 
-        self.register_buffer('box_type_embeddings', embedding_template)
-        self.register_buffer('box_type_valid', valid_template)
+        self.register_buffer('box_type_embeddings', embedding_template, persistent=False)
+        self.register_buffer('box_type_valid', valid_template, persistent=False)
 
     def _add_prompting(self, pseudo_words, word_masks, positional_embeddings, box_types=None):
 
         prompts = self.prompt(pseudo_words)
-        if self.cfg.USE_BOX_POSITION:
-            prompts = prompts + positional_embeddings
+        if not self.cfg.USE_BOX_POSITION:
+            positional_embeddings = positional_embeddings * 0.0
+        prompts = prompts + positional_embeddings
         box_type_embeddings = self.box_type_embeddings[box_types]
         box_type_valid = self.box_type_valid[box_types]
 
