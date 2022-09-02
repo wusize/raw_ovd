@@ -419,7 +419,8 @@ class ContextModelling(nn.Module):
             num_words_per_pred = [wm.sum(-1).tolist() for wm in word_masks]
             clip_word_features = [tk.split(spl) for (tk, spl)
                                   in zip(clip_word_tokens, num_words_per_pred)]
-            clip_word_features = F.normalize(torch.stack([feat.mean(0).float()
+            # Discard the prompt
+            clip_word_features = F.normalize(torch.stack([feat[self.cfg.PROMPT_LENGTH:].mean(0).float()
                                                           for feats in clip_word_features
                                                           for feat in feats], dim=0), dim=-1)
             tok = time()
