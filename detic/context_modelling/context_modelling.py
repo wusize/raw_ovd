@@ -158,10 +158,12 @@ class ContextModelling(nn.Module):
         nmsed_proposals.sample_types[:] = 1    # clip_kd_samples: 1
         func = self.checkboard_sampling.sample
         boxes = nmsed_proposals.proposal_boxes.tensor.tolist()
-        groups_per_proposal, normed_boxes, spanned_boxes, box_ids = \
+        groups_per_proposal, normed_boxes, spanned_boxes, box_ids, box_types = \
             multi_apply(func, boxes,
                         [nmsed_proposals.image_size] * len(nmsed_proposals))
         new_boxes = torch.cat([c for p in groups_per_proposal
+                               for g in p for c in g], dim=0).to(device)
+        box_types = torch.cat([c for p in box_types
                                for g in p for c in g], dim=0).to(device)
         num_added = len(new_boxes)
         added_instances = Instances(image_size=nmsed_proposals.image_size,
@@ -177,7 +179,8 @@ class ContextModelling(nn.Module):
 
         return added_instances, dict(normed_boxes=normed_boxes,
                                      spanned_boxes=spanned_boxes,
-                                     box_ids=box_ids)
+                                     box_ids=box_ids,
+                                     box_types=box_types)
 
     def _caption_sampling(self, topk_proposals, mask_on=False):
         if not self.caption_cfg.ENABLE:

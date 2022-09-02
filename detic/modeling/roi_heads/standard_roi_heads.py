@@ -11,9 +11,8 @@ from detectron2.utils.events import get_event_storage
 from detectron2.modeling.proposal_generator.proposal_utils \
     import add_ground_truth_to_proposals
 from detectron2.structures import pairwise_iou
-from detic.context_modelling.context_modelling import ContextModelling
+from detic import context_modelling
 from time import time
-from torchvision.ops import box_iou
 
 
 @ROI_HEADS_REGISTRY.register()
@@ -28,10 +27,11 @@ class CustomStandardROIHeads(StandardROIHeads):
             cfg,  self.box_head.output_shape
         )
 
-        self.context_modeling_cfg = cfg.CONTEXT_MODELLING
+        self.context_modeling_cfg = cfg.CONTEXT_MODELLING \
+            if self.context_modeling_cfg.VERSION != 'V4' else cfg.CONTEXT_MODELLING_V4
         self.cfg = cfg
-
-        self.context_modeling = ContextModelling(self.context_modeling_cfg,
+        ContextModelling = getattr(context_modelling, f'ContextModelling{self.context_modeling_cfg.VERSION}')
+        self.context_modeling = ContextModelling(self.context_modeling_cfg.VERSION,
                                                  num_words=self.box_predictor.num_words,
                                                  word_embed_dim=self.box_predictor.word_embed_dim,
                                                  word_dropout=self.box_predictor.word_dropout)

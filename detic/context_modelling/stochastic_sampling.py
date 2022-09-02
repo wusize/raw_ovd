@@ -100,6 +100,36 @@ def pseudo_permutations(seq_length, num_permutation):
     return [list(next(rand_perms)) for _ in range(num_permutation)]
 
 
+def box_ids2box_types(box_ids):
+    """
+            top
+     left  center  right
+           botton
+
+
+    """
+    box_ids = torch.tensor(box_ids)
+    box_ijs = torch.stack([box_ids // 3, box_ids % 3], dim=-1)
+
+    vertical_num = box_ijs[:, 0].max() - box_ijs[:, 0].min() + 1
+    horizontal_num = box_ijs[:, 1].max() - box_ijs[:, 1].min() + 1
+    box_ijs[:, 0] = box_ijs[:, 0] - box_ijs[:, 0].min()
+    box_ijs[:, 1] = box_ijs[:, 1] - box_ijs[:, 1].min()
+
+    if vertical_num == 1:
+        box_ijs[:, 0] = 1
+    elif vertical_num == 2:
+        box_ijs[:, 0] = torch.where(box_ijs[:, 0] == 0, 0, 2)
+
+    if horizontal_num == 1:
+        box_ijs[:, 1] = 1
+    elif horizontal_num == 2:
+        box_ijs[:, 1] = torch.where(box_ijs[:, 1] == 0, 0, 2)
+
+    return box_ijs[:, 0] * 3 + box_ijs[:, 1]
+
+
+
 class StochasticSampling:
     """
         checkboard:   0  1  2
@@ -108,6 +138,7 @@ class StochasticSampling:
         context boxes: [0, 1, 2, 3, 5, 6, 7, 8]
         candidate_groups: 2 ** 8 = 256
         box: tensor
+        box type: "left", "right", "top", "bottom", "center", "left up", "left bottom", ...
     """
     def __init__(self,
                  max_groups=4,
@@ -212,13 +243,12 @@ class StochasticSampling:
         off_set = np.array(box, dtype=np.float32) - center_box_template
         box_templates = box_templates + off_set.reshape(1, 4)
 
-        groups, normed_boxes, spanned_boxes, box_ids = multi_apply(self._sample_boxes_per_group,
-                                                                   box_ids_per_group,
-                                                                   image_size=image_size,
-                                                                   box_templates=box_templates)
+        groups, normed_boxes, spanned_boxes, box_ids, box_types = multi_apply(
+            self._sample_boxes_per_group, box_ids_per_group, image_size=image_size,
+            box_templates=box_templates)
         box_ids = [box_id for box_ids_ in box_ids for box_id in box_ids_]
 
-        return groups, normed_boxes, spanned_boxes, box_ids
+        return groups, normed_boxes, spanned_boxes, box_ids, box_types
 
     def _sample_boxes_per_group(self, box_ids, image_size, box_templates):   # TODO: paralell
 
@@ -227,6 +257,7 @@ class StochasticSampling:
         # pseudo_perm = list(range(num_boxes))
         # all_permutations = [pseudo_perm, pseudo_perm[::-1]]
         boxes = box_templates[box_ids]
+        box_types = box_ids2box_types(box_ids)
         boxes = clamp_with_image_size(boxes.reshape(-1, 2), image_size).reshape(-1, 4)
         spanned_box = get_spanned_box(boxes)
         normed_boxes = get_normed_boxes(boxes, spanned_box)
@@ -238,10 +269,11 @@ class StochasticSampling:
         box_permutations = pseudo_permutations(num_boxes, num_permutations)
 
         boxes_list = [torch.from_numpy(boxes[perm]) for perm in box_permutations]
+        box_type_list = [box_types[perm] for perm in box_permutations]
         normed_boxes_list = [torch.from_numpy(normed_boxes[perm]) for perm in box_permutations]
         box_ids_list = [[box_ids[idx] for idx in perm] for perm in box_permutations]
 
-        return boxes_list, normed_boxes_list, torch.from_numpy(spanned_box), box_ids_list
+        return boxes_list, normed_boxes_list, torch.from_numpy(spanned_box), box_ids_list, box_type_list
 
 
 if __name__ == '__main__':
