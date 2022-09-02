@@ -10,7 +10,7 @@ import torch
 from tqdm import tqdm
 sys.path.insert(0, 'third_party/CenterNet2/')
 sys.path.insert(0, 'third_party/Deformable-DETR')
-from detic.modeling.roi_heads.context_modelling import ContextModelling
+from detic.context_modelling.context_modelling_v4 import ContextModellingV4 as ContextModelling
 from detic.config import add_detic_config
 from detic.data.datasets.coco_zeroshot import categories_unseen
 
@@ -34,11 +34,17 @@ cfg = get_cfg()
 add_detic_config(cfg)
 cfg.INPUT.MIN_SIZE_TRAIN = (800,)
 cfg.INPUT.RANDOM_FLIP = "none"
-cfg.CONTEXT_MODELLING.ENABLE = True
-cfg.CONTEXT_MODELLING.CHECKBOARD.ENABLE = True
+cfg.CONTEXT_MODELLING_V4.CHECKBOARD.SHAPE_RATIO_THR = [0.25] * 4
+cfg.CONTEXT_MODELLING_V4.CHECKBOARD.NMS_THR = [0.10] * 4
+cfg.CONTEXT_MODELLING_V4.CHECKBOARD.AREA_THR = [-1, 112, 224, -1]
+cfg.CONTEXT_MODELLING_V4.CHECKBOARD.OBJECTNESS_THR = [0.5, 0.5, 0.5, 0.5]
+cfg.CONTEXT_MODELLING_V4.CHECKBOARD.AREA_RATIO_THR = 0.002
+cfg.CONTEXT_MODELLING_V4.CHECKBOARD.TOPK = [10, 15, 15, 15]
+cfg.CONTEXT_MODELLING_V4.ENABLE = True
+cfg.CONTEXT_MODELLING_V4.CHECKBOARD.ENABLE = True
 augs = detection_utils.build_augmentation(cfg, True)
 augs = transforms.AugmentationList(augs)
-sampler = ContextModelling(cfg.CONTEXT_MODELLING, 4, 512, 0.5, sigmoid=True)
+sampler = ContextModelling(cfg.CONTEXT_MODELLING_V4, 4, 512, 0.5, sigmoid=True)
 
 output_root = args.output_root
 os.makedirs(output_root, exist_ok=True)
@@ -76,7 +82,7 @@ for img_id, img_info in tqdm(coco.imgs.items()):
     gt_instances = detection_utils.annotations_to_instances(
         annos, image_shape, mask_format="polygon"
     )
-    instances = add_ground_truth_to_proposals([gt_instances], [instances])[0]
+    instances = add_ground_truth_to_proposals([gt_instances[is_novel < 1.0]], [instances])[0]   # only add base classes
 
     topk_proposals = sampler.sample_topk_proposals(instances)
     nmsed_proposals = sampler.preprocess_proposals(topk_proposals,
