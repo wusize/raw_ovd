@@ -114,7 +114,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             self.register_buffer('word_embeddings', word_embeddings)
 
         self.pe_cfg = self.cfg.MODEL.ROI_BOX_HEAD.POSITIONAL_ENCODING
-        assert self.pe_cfg.NUM_WORDS == 1 or self.pe_cfg.NUM_WORDS == num_words
+        # assert self.pe_cfg.NUM_WORDS == 1 or self.pe_cfg.NUM_WORDS == num_words
         if self.pe_cfg.ENABLE:
             self.positional_encoder = SinePositionalEncoding(
                 num_words=self.pe_cfg.NUM_WORDS,
@@ -408,8 +408,8 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         return pseudo_words + positional_embeddings
 
     def cal_score_by_clip_text_encoder(self, pseudo_words):
-        if self.pe_cfg.APPLY_TO_BASE:
-            pseudo_words = self._pseudo_positional_encode(pseudo_words)
+        # if self.pe_cfg.APPLY_TO_BASE:
+        #     pseudo_words = self._pseudo_positional_encode(pseudo_words)
         clip_model = self.clip
         clip_model.eval()
         with autocast():

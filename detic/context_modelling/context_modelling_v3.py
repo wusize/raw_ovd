@@ -149,8 +149,8 @@ class ContextModellingV3(ContextModelling):
             multi_apply(process_single_image_groups, group_info, device=device)
         positions = bbox_xyxy_to_cxcywh(torch.cat(normed_boxes, dim=0))
         position_embeddings = positional_encoder(positions)
-        pseudo_words = pseudo_words + position_embeddings
         word_masks = self._drop_word(pseudo_words)
+        pseudo_words, word_masks = self._add_prompting(pseudo_words, word_masks, position_embeddings)
         start_id = 0
         seq_ids = []
         for g in group_info:

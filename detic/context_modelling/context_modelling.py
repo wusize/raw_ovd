@@ -15,6 +15,7 @@ from time import time
 from torch.cuda.amp import autocast
 from detic.modeling import clip as CLIP
 from detectron2.structures.masks import PolygonMasks
+from .prompting import Prompting
 
 
 def identity_func(x):
@@ -100,6 +101,8 @@ class ContextModelling(nn.Module):
             self.bce_bias = nn.Parameter(torch.tensor(0.0))
 
             self.queues = Queues(queue_cfg=self.cfg.QUEUE)
+            self.prompt = Prompting(num_words=self.cfg.PROMPT_LENGTH,
+                                    word_dims=word_embed_dim)
 
     # preprocess topk proposals
     def preprocess_proposals(self, proposals, shape_ratio_thr, area_ratio_thr, objectness_thr, nms_thr):
@@ -271,14 +274,11 @@ class ContextModelling(nn.Module):
 
         return mask
 
-    def _add_prompting(self, pseudo_words, word_masks, positions):
-        if self.prompting_cfg.ENABLE:
-            prompts = self.prompt(pseudo_words)
-            if self.prompting_cfg.POSITION_AWARE:
-                prompts = prompts + self.positional_embedding(positions)
-            prompt_masks = torch.ones_like(prompts[..., 0]) > 0.0
-            pseudo_words = torch.cat([prompts, pseudo_words], dim=1)
-            word_masks = torch.cat([prompt_masks, word_masks], dim=1)
+    def _add_prompting(self, pseudo_words, word_masks, positional_embeddings):
+        prompts = self.prompt(pseudo_words) + positional_embeddings
+        prompt_masks = torch.ones_like(prompts[..., 0]) > 0.0
+        pseudo_words = torch.cat([prompts, pseudo_words], dim=1)
+        word_masks = torch.cat([prompt_masks, word_masks], dim=1)
         return pseudo_words, word_masks
 
     @torch.no_grad()
@@ -324,8 +324,10 @@ class ContextModelling(nn.Module):
             multi_apply(process_single_image_groups, group_info, device=device)
         positions = bbox_xyxy_to_cxcywh(torch.cat(normed_boxes, dim=0))
         position_embeddings = positional_encoder(positions)
-        pseudo_words = pseudo_words + position_embeddings
         word_masks = self._drop_word(pseudo_words)
+        pseudo_words, word_masks = self._add_prompting(pseudo_words, word_masks, position_embeddings)
+        # pseudo_words = pseudo_words + position_embeddings
+        # word_masks = self._drop_word(pseudo_words)
         start_id = 0
         seq_ids = []
         for g in group_info:
