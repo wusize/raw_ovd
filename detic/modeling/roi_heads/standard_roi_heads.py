@@ -26,12 +26,11 @@ class CustomStandardROIHeads(StandardROIHeads):
         self.box_predictor = DeticFastRCNNOutputLayers(
             cfg,  self.box_head.output_shape
         )
-
-        self.context_modeling_cfg = cfg.CONTEXT_MODELLING \
-            if self.context_modeling_cfg.VERSION != 'V4' else cfg.CONTEXT_MODELLING_V4
+        self.context_modeling_cfg = cfg.CONTEXT_MODELLING
         self.cfg = cfg
+        assert self.context_modeling_cfg.VERSION != 'V4'
         ContextModelling = getattr(context_modelling, f'ContextModelling{self.context_modeling_cfg.VERSION}')
-        self.context_modeling = ContextModelling(self.context_modeling_cfg.VERSION,
+        self.context_modeling = ContextModelling(self.context_modeling_cfg,
                                                  num_words=self.box_predictor.num_words,
                                                  word_embed_dim=self.box_predictor.word_embed_dim,
                                                  word_dropout=self.box_predictor.word_dropout)
