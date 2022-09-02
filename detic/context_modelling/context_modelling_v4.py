@@ -43,6 +43,7 @@ class ContextModellingV4(ContextModelling):
         # TODO: sample at each level
         multi_level_instances = []
         for i in range(num_levels):
+            max_num = self.checkboard_cfg.TOPK[i]
             lvl_proposals = topk_proposals[level_assignment == i]
             if len(lvl_proposals) == 0:
                 continue
@@ -55,6 +56,9 @@ class ContextModellingV4(ContextModelling):
                                                       area_ratio_thr,
                                                       objectness_thr,
                                                       nms_thr)
+            if len(lvl_proposals) > max_num:
+                _, topk_indices = lvl_proposals.objectness_logits.topk(max_num)
+                lvl_proposals = lvl_proposals[topk_indices]
             lvl_proposals.sample_types[:] = 1    # clip_kd_samples: 1
             multi_level_instances.append(lvl_proposals)
         sampled_proposals = Instances.cat(multi_level_instances)
