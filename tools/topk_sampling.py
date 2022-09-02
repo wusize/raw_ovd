@@ -85,11 +85,7 @@ for img_id, img_info in tqdm(coco.imgs.items()):
     instances = add_ground_truth_to_proposals([gt_instances[is_novel < 1.0]], [instances])[0]   # only add base classes
 
     topk_proposals = sampler.sample_topk_proposals(instances)
-    nmsed_proposals = sampler.preprocess_proposals(topk_proposals,
-                                                   sampler.cfg.SHAPE_RATIO_THR,
-                                                   sampler.checkboard_cfg.AREA_RATIO_THR,
-                                                   sampler.cfg.OBJECTNESS_THR,
-                                                   sampler.checkboard_cfg.NMS_THR)
+    nmsed_proposals = sampler.multilevel_process(topk_proposals)
     novel_instances = gt_instances[is_novel > 0.0]
     for box in novel_instances.gt_boxes.tensor:
         x0, y0, x1, y1 = box.long().tolist()
