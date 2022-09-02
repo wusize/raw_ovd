@@ -17,18 +17,18 @@ class ContextModellingV6(ContextModelling):
         box_types = ["top left", "top", "top right",
                      "left", "center", "right",
                      "bottom left", "bottom", "bottom right"]
-        box_type_info = torch.load("datasets/metadata/box_type_embeddings.pth")   # hard code this
-        assert box_types == box_type_info['box_types']
+        # box_type_info = torch.load("datasets/metadata/box_type_embeddings.pth")   # hard code this
+        # assert box_types == box_type_info['box_types']
         prompt_length = self.cfg.PROMPT_LENGTH
-        box_type_embeddings = box_type_info['embeddings']
-        valid = box_type_info['valid']
-        saved_length = valid.shape[1]
-        assert prompt_length >= saved_length
-        embedding_template = torch.zeros(len(box_types), prompt_length, box_type_embeddings.shape[-1])
+        # box_type_embeddings = box_type_info['embeddings']
+        # valid = box_type_info['valid']
+        # saved_length = valid.shape[1]
+        # assert prompt_length >= saved_length
+        embedding_template = torch.zeros(len(box_types), prompt_length, self.num_words_per_pred)
         valid_template = torch.zeros(len(box_types), prompt_length, 1)
 
-        embedding_template[:, :saved_length] = box_type_embeddings
-        valid_template[:, :saved_length, 0] = valid
+        # embedding_template[:, :saved_length] = box_type_embeddings
+        # valid_template[:, :saved_length, 0] = valid
 
         self.register_buffer('box_type_embeddings', embedding_template, persistent=False)
         self.register_buffer('box_type_valid', valid_template, persistent=False)
