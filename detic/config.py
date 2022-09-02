@@ -236,3 +236,4 @@ def add_detic_config(cfg):
     _C.CONTEXT_MODELLING_V4.CHECKBOARD.TOPK = [10, 10, 10, 10]
 
     _C.MODEL.ROI_BOX_HEAD.USE_ALL_ENCODER = True
+    _C.MODEL.ROI_BOX_HEAD.DROP_LAST = False

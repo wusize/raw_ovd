@@ -367,6 +367,8 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
                          p=p,
                          training=self.training)
         start_end_mask = torch.ones_like(mask[:, :1])
+        if self.cfg.MODEL.ROI_BOX_HEAD.DROP_LAST:
+            mask[..., -1] = 0.0
         # check empty
         is_empty = mask.sum(dim=-1) == 0.0
         mask[is_empty, 0] = 1.0       # TODO add random on this
