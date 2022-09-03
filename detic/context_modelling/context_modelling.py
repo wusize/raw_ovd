@@ -75,7 +75,7 @@ class ContextModelling(nn.Module):
         super(ContextModelling, self).__init__()
         self.num_words_per_pred = num_words
         self.word_embed_dim = word_embed_dim
-        self.word_dropout = word_dropout
+        self.word_dropout = cfg.DROPOUT
         self.cfg = cfg
         checkboard_cfg = cfg.CHECKBOARD
         if sigmoid:
