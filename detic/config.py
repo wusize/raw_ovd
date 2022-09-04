@@ -201,3 +201,10 @@ def add_detic_config(cfg):
                                         'clip_caption_features']
     _C.MODEL.SAVE_PROPOSALS = False
     _C.SAVE_DEBUG_PATH = 'output/save_debug/'
+
+    _C.MODEL.RPN.DETACH_FOR_OBJECTNESS = False
+    _C.MODEL.RPN.OLN = CN()
+    _C.MODEL.RPN.OLN.ENABLE = False
+    _C.MODEL.RPN.OLN.DETACH = False
+    _C.MODEL.RPN.OLN.LOSS_WEIGHT = 1.0
+    _C.MODEL.RPN.OLN.IOU_THRESHOLD = 0.3
