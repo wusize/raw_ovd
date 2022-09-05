@@ -1,14 +1,11 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
+from detectron2.modeling.proposal_generator import RPN_HEAD_REGISTRY
 from typing import List
 import torch
-from detectron2.modeling.proposal_generator import RPN_HEAD_REGISTRY, StandardRPNHead
-from typing import Dict, List, Optional, Tuple, Union
-import torch
-import torch.nn.functional as F
 from torch import nn
 
 from detectron2.config import configurable
-from detectron2.layers import Conv2d, ShapeSpec, cat
+from detectron2.layers import Conv2d
 from detectron2.modeling.anchor_generator import build_anchor_generator
 
 
@@ -25,22 +22,6 @@ class CustomRPNHead(nn.Module):
     def __init__(
         self, *, in_channels: int, num_anchors: int, box_dim: int = 4, conv_dims: List[int] = (-1,)
     ):
-        """
-        NOTE: this interface is experimental.
-
-        Args:
-            in_channels (int): number of input feature channels. When using multiple
-                input features, they must have the same number of channels.
-            num_anchors (int): number of anchors to predict for *each spatial position*
-                on the feature map. The total number of anchors for each
-                feature map will be `num_anchors * H * W`.
-            box_dim (int): dimension of a box, which is also the number of box regression
-                predictions to make for each anchor. An axis aligned box has
-                box_dim=4, while a rotated box has box_dim=5.
-            conv_dims (list[int]): a list of integers representing the output channels
-                of N conv layers. Set it to -1 to use the same number of output channels
-                as input channels.
-        """
         super().__init__()
         cur_channels = in_channels
         # Keeping the old variable names and structure for backwards compatiblity.
@@ -62,7 +43,11 @@ class CustomRPNHead(nn.Module):
                 self.conv.add_module(f"conv{k}", conv)
                 cur_channels = out_channels
         # 1x1 conv for predicting objectness logits
-        self.objectness_logits = nn.Conv2d(cur_channels, num_anchors, kernel_size=1, stride=1)
+        if self.cfg.MODEL.RPN.DETACH_FOR_OBJECTNESS:
+            self.objectness_logits = nn.Sequential(self._get_rpn_conv(cur_channels, cur_channels),
+                                                   nn.Conv2d(cur_channels, num_anchors, kernel_size=1, stride=1))
+        else:
+            self.objectness_logits = nn.Conv2d(cur_channels, num_anchors, kernel_size=1, stride=1)
         # 1x1 conv for predicting box2box transform deltas
         self.anchor_deltas = nn.Conv2d(cur_channels, num_anchors * box_dim, kernel_size=1, stride=1)
         self.oln_cfg = self.cfg.MODEL.RPN.OLN
