@@ -10,6 +10,7 @@ from detectron2.layers import cat
 import torch.nn.functional as F
 from detectron2.structures.boxes import matched_pairwise_iou
 import random
+from .utils import centerness_score
 
 
 @PROPOSAL_GENERATOR_REGISTRY.register()
@@ -23,26 +24,6 @@ class IOURPN(CustomRPN):
         pred_anchor_deltas: List[torch.Tensor],
         gt_boxes: List[torch.Tensor],
     ) -> Dict[str, torch.Tensor]:
-        """
-        Return the losses from a set of RPN predictions and their associated ground-truth.
-
-        Args:
-            anchors (list[Boxes or RotatedBoxes]): anchors for each feature map, each
-                has shape (Hi*Wi*A, B), where B is box dimension (4 or 5).
-            pred_objectness_logits (list[Tensor]): A list of L elements.
-                Element i is a tensor of shape (N, Hi*Wi*A) representing
-                the predicted objectness logits for all anchors.
-            gt_labels (list[Tensor]): Output of :meth:`label_and_sample_anchors`.
-            pred_anchor_deltas (list[Tensor]): A list of L elements. Element i is a tensor of shape
-                (N, Hi*Wi*A, 4 or 5) representing the predicted "deltas" used to transform anchors
-                to proposals.
-            gt_boxes (list[Tensor]): Output of :meth:`label_and_sample_anchors`.
-
-        Returns:
-            dict[loss name -> loss value]: A dict mapping from loss name to loss value.
-                Loss names are: `loss_rpn_cls` for objectness classification and
-                `loss_rpn_loc` for proposal localization.
-        """
         num_images = len(gt_labels)
         gt_labels = torch.stack(gt_labels)  # (N, sum(Hi*Wi*Ai))
 
@@ -89,7 +70,8 @@ class IOURPN(CustomRPN):
         num_samples = min(len(positive_samples), num_samples)
         positive_samples = random.sample(positive_samples, k=num_samples)
 
-        targets = ious[positive_samples]
+        targets = self._get_geometric_targets(anchors[positive_samples],
+                                              gt_boxes[positive_samples])
         preds = pred_objectness_logits[positive_samples]
 
         objectness_loss = F.binary_cross_entropy_with_logits(
@@ -100,3 +82,21 @@ class IOURPN(CustomRPN):
         normalizer = self.batch_size_per_image * num_images
 
         return objectness_loss / normalizer
+
+    @staticmethod
+    def _get_geometric_targets(anchors, gt_boxes):
+        return matched_pairwise_iou(anchors, Boxes(gt_boxes))
+
+
+@PROPOSAL_GENERATOR_REGISTRY.register()
+class CenternessRPN(IOURPN):
+    @staticmethod
+    def _get_geometric_targets(anchors, gt_boxes):
+        return centerness_score(anchors.tensor, gt_boxes)
+
+
+@PROPOSAL_GENERATOR_REGISTRY.register()
+class IOUCenternessRPN(IOURPN):
+    def _get_geometric_targets(self, anchors, gt_boxes):
+        ious = super(IOUCenternessRPN, self)._get_geometric_targets(anchors, gt_boxes)
+        return torch.sqrt(centerness_score(anchors.tensor, gt_boxes) * ious)

@@ -9,7 +9,7 @@ from .modeling.rpn.custom_rpn import CustomRPN
 from .modeling.rpn.rpn_heads import CustomRPNHead, GradRPNHead
 from .modeling.rpn.oln_rpn import OLNRPN
 from .modeling.meta_arch.custom_rcnn_v2 import CustomRCNNV2
-from .modeling.rpn.iou_rpn import IOURPN
+from .modeling.rpn.iou_rpn import IOURPN, CenternessRPN, IOUCenternessRPN
 
 
 from .data.datasets import lvis_v1
