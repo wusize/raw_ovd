@@ -67,6 +67,8 @@ class IOURPN(CustomRPN):
         ious = matched_pairwise_iou(anchors, Boxes(gt_boxes))
 
         positive_samples = torch.where(ious > iou_thr)[0].tolist()
+        if len(positive_samples) == 0:
+            positive_samples = ious.topk(5).indices.tolist()
         num_samples = min(len(positive_samples), num_samples)
         positive_samples = random.sample(positive_samples, k=num_samples)
 
