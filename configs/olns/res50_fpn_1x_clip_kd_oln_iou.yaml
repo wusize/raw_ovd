@@ -5,7 +5,7 @@ MODEL:
     NAME: "OLNRPN"
   RPN:
     HEAD_NAME: "CustomRPNHead"
-    DETACH_FOR_OBJECTNESS: True      # set as default
+    DETACH_FOR_OBJECTNESS: False      # set as default
     OLN:
       ENABLE: True
       DETACH: False
