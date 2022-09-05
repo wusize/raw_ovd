@@ -85,17 +85,17 @@ class ContextModellingSmooth(ContextModelling):
         # text features as queries
         image_keys = torch.cat([clip_image_features, global_clip_image_features[..., :-1]], dim=0)
         similarity_matrix_0 = self.ce_temp * clip_text_features @ image_keys.T
-        similarity_matrix_0[:, :num_queries][label_mask] = float('-inf')
+        similarity_matrix_0[:, :num_queries][label_mask] = -self.ce_temp
         if global_image_feature_img_ids.shape[0] > 0:
             img_id_mask_0 = img_ids[:, None] == global_image_feature_img_ids[None]
-            similarity_matrix_0[:, num_queries:][img_id_mask_0] = float('-inf')
+            similarity_matrix_0[:, num_queries:][img_id_mask_0] = -self.ce_temp
         # image features as queries
         text_keys = torch.cat([clip_text_features, global_clip_text_features[..., :-1]], dim=0)
         similarity_matrix_1 = self.ce_temp * clip_image_features @ text_keys.T
-        similarity_matrix_1[:, :num_queries][label_mask] = float('-inf')
+        similarity_matrix_1[:, :num_queries][label_mask] = -self.ce_temp
         if global_text_feature_img_ids.shape[0] > 0:
             img_id_mask_1 = img_ids[:, None] == global_text_feature_img_ids[None]
-            similarity_matrix_1[:, num_queries:][img_id_mask_1] = float('-inf')
+            similarity_matrix_1[:, num_queries:][img_id_mask_1] = -self.ce_temp
 
         label = torch.arange(num_queries).to(device)
 
@@ -158,19 +158,19 @@ class ContextModellingSmooth(ContextModelling):
             similarity_matrix_0 = self.token_temp * clip_word_features @ image_keys.T
             if global_patch_feature_img_ids.shape[0] > 0:
                 img_id_mask_0 = img_ids[:, None] == global_patch_feature_img_ids[None]
-                similarity_matrix_0[:, num_queries:][img_id_mask_0] = float('-inf')
+                similarity_matrix_0[:, num_queries:][img_id_mask_0] = -self.token_temp
             # image features as queries
             text_keys = torch.cat([clip_word_features, global_clip_word_features[..., :-1]])
             similarity_matrix_1 = self.token_temp * clip_patch_features @ text_keys.T
             if global_word_feature_img_ids.shape[0] > 0:
                 img_id_mask_1 = img_ids[:, None] == global_word_feature_img_ids[None]
-                similarity_matrix_1[:, num_queries:][img_id_mask_1] = float('-inf')
+                similarity_matrix_1[:, num_queries:][img_id_mask_1] = -self.token_temp
             labels = torch.arange(num_queries, device=device)
             label_mask = box_ids[None] == box_ids[:, None]
             label_mask.fill_diagonal_(False)
 
-            similarity_matrix_0[:, :num_queries][label_mask] = float('-inf')
-            similarity_matrix_1[:, :num_queries][label_mask] = float('-inf')
+            similarity_matrix_0[:, :num_queries][label_mask] = -self.token_temp
+            similarity_matrix_1[:, :num_queries][label_mask] = -self.token_temp
 
             loss = self.smooth_loss(similarity_matrix_0, labels) * 0.5 \
                    + self.smooth_loss(similarity_matrix_1, labels) * 0.5
