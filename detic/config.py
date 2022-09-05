@@ -210,3 +210,5 @@ def add_detic_config(cfg):
     _C.MODEL.RPN.OLN.IOU_THRESHOLDS = [0.1, 0.3]
     _C.MODEL.RPN.OLN.USE_IOU = True
     _C.MODEL.RPN.OLN.USE_CENTERNESS = True
+
+    _C.MODEL.RPN.BCE_GRAD = 1.0

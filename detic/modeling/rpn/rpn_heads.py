@@ -1,9 +1,9 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
-from detectron2.modeling.proposal_generator import RPN_HEAD_REGISTRY
+from detectron2.modeling.proposal_generator import RPN_HEAD_REGISTRY, StandardRPNHead
 from typing import List
 import torch
 from torch import nn
-
+from torch.autograd.function import Function
 from detectron2.config import configurable
 from detectron2.layers import Conv2d
 from detectron2.modeling.anchor_generator import build_anchor_generator
@@ -113,3 +113,55 @@ class CustomRPNHead(nn.Module):
                 pred_location_logits.append(None)
             pred_anchor_deltas.append(self.anchor_deltas(t))
         return pred_objectness_logits, pred_anchor_deltas, pred_location_logits
+
+
+class _ScaleGradient(Function):
+    @staticmethod
+    def forward(ctx, input, scale):
+        ctx.scale = scale
+        return input
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        return grad_output * ctx.scale, None
+
+
+@RPN_HEAD_REGISTRY.register()
+class GradRPNHead(StandardRPNHead):
+    @configurable
+    def __init__(self, **kwargs):
+        grad_scale = kwargs.pop('grad_scale')
+        super().__init__(**kwargs)
+        self.grad_scale = grad_scale
+
+    @classmethod
+    def from_config(cls, cfg, input_shape):
+        ret = super().from_config(cfg, input_shape)
+        ret["grad_scale"] = cfg.MODEL.RPN.BCE_GRAD
+        return ret
+
+    def forward(self, features: List[torch.Tensor]):
+        """
+        Args:
+            features (list[Tensor]): list of feature maps
+
+        Returns:
+            list[Tensor]: A list of L elements.
+                Element i is a tensor of shape (N, A, Hi, Wi) representing
+                the predicted objectness logits for all anchors. A is the number of cell anchors.
+            list[Tensor]: A list of L elements. Element i is a tensor of shape
+                (N, A*box_dim, Hi, Wi) representing the predicted "deltas" used to transform anchors
+                to proposals.
+        """
+        pred_objectness_logits = []
+        pred_anchor_deltas = []
+        for x in features:
+            t = self.conv(x)
+            pred_objectness_logits.append(self._forward_objectness_logits(t))
+            pred_anchor_deltas.append(self.anchor_deltas(t))
+        return pred_objectness_logits, pred_anchor_deltas
+
+    def _forward_objectness_logits(self, feature):
+        if self.training:
+            feature = _ScaleGradient.apply(feature, self.grad_scale)
+        return self.objectness_logits(feature)
