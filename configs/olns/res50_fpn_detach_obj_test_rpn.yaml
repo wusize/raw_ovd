@@ -47,7 +47,9 @@ CONTEXT_MODELLING:
   QUEUE:
     LENGTHS: [1024, 1024, 1024, 1024]
     NAMES: ['clip_text_features', 'clip_image_features', 'clip_word_features', 'clip_patch_features']
-
+DATASETS:
+  TRAIN: ("coco_zeroshot_train_oriorder",)
+  TEST: ("coco_zeroshot_val", "coco_not_zeroshot_val")
 DATALOADER:
   FILTER_EMPTY_ANNOTATIONS: True
 
