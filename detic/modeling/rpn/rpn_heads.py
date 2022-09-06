@@ -165,3 +165,26 @@ class GradRPNHead(StandardRPNHead):
         if self.training:
             feature = _ScaleGradient.apply(feature, self.grad_scale)
         return self.objectness_logits(feature)
+
+
+@RPN_HEAD_REGISTRY.register()
+class AddConvRPNHead(GradRPNHead):
+    @configurable
+    def __init__(self, **kwargs):
+        obj_convs = kwargs.pop('obj_convs')
+        super().__init__(**kwargs)
+        cur_channels = self.objectness_logits.in_channels
+        num_anchors = self.objectness_logits.out_channels
+        if obj_convs > 1:
+            self.objectness_logits = nn.Sequential()
+            for k in range(obj_convs - 1):
+                conv = self._get_rpn_conv(cur_channels, cur_channels)
+                self.objectness_logits.add_module(f"conv{k}", conv)
+            self.objectness_logits.add_module(f"conv_final",
+                                              nn.Conv2d(cur_channels, num_anchors, kernel_size=1, stride=1))
+
+    @classmethod
+    def from_config(cls, cfg, input_shape):
+        ret = super().from_config(cfg, input_shape)
+        ret.update(obj_convs=cfg.MODEL.RPN.OBJ_CONVS)
+        return ret
