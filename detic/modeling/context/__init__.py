@@ -1,2 +1,3 @@
 from .context_modelling import ContextModelling
 from .context_modelling_smooth import ContextModellingSmooth
+from .context_modelling_focal import ContextModellingFocal
