@@ -1,6 +1,6 @@
 _BASE_: "../Base_OVCOCO_FPN_1x.yaml"
 MODEL:
-  META_ARCHITECTURE: "ProposalNetwork"
+  META_ARCHITECTURE: "CustomProposalNetworkV2"
   PROPOSAL_GENERATOR:
     NAME: "OLNRPN"
   RPN:
