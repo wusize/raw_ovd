@@ -163,7 +163,10 @@ class GradRPNHead(StandardRPNHead):
 
     def _forward_objectness_logits(self, feature):
         if self.training:
-            feature = _ScaleGradient.apply(feature, self.grad_scale)
+            if self.grad_scale > 0.0:
+                feature = _ScaleGradient.apply(feature, self.grad_scale)
+            else:
+                feature = feature.detach()
         return self.objectness_logits(feature)
 
 
