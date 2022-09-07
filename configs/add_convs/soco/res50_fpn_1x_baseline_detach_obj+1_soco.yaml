@@ -1,0 +1,24 @@
+# to reproduce the current best on soco
+_BASE_: "./Base_OVCOCO_FPN_1x_soco.yaml"
+MODEL:
+  RPN:
+    HEAD_NAME: "AddConvRPNHead"
+    OBJ_CONVS: 2    # to further strengthen the obj part
+    BCE_GRAD: 0.0   # equivalent to detach
+  ROI_BOX_HEAD:
+    RANDOM_DROPOUT: 0.5
+    NORM_TEMP: 25.0
+    USE_BIAS: -20.0
+  PROPOSAL_GENERATOR:
+    NAME: "CustomRPN"
+  CLIP:
+    USE_IMAGE_ENCODER: True
+  WITH_IMAGE_LABELS: False
+
+DATALOADER:
+  FILTER_EMPTY_ANNOTATIONS: True
+
+SOLVER:
+  CHECKPOINT_PERIOD: 90000
+TEST:
+  EVAL_PERIOD: 3000
