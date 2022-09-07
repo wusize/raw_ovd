@@ -5,6 +5,7 @@ MODEL:
     OBJ_CONVS: 2    # to further strengthen the obj part
     BCE_GRAD: -1    # equivalent to detach
   ROI_BOX_HEAD:
+    FC_DIM: 2048
     NUM_CONV: 4
     NUM_FC: 1
     RANDOM_DROPOUT: 0.5
