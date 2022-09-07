@@ -96,6 +96,33 @@ class CenternessRPN(IOURPN):
     def _get_geometric_targets(anchors, gt_boxes):
         return centerness_score(anchors.tensor, gt_boxes)
 
+    def _iou_loss(self, anchors, gt_boxes, pred_objectness_logits):
+        # TODO for centerness loss, use L1 loss
+        # sample
+        num_images = len(gt_boxes)
+        iou_thr = self.anchor_matcher.thresholds[1]              # 0.3 as default
+        num_samples = self.batch_size_per_image * num_images     # 256 as default
+
+        pred_objectness_logits = cat(pred_objectness_logits, dim=1).view(-1)
+        gt_boxes = torch.cat(gt_boxes)
+        anchors = Boxes.cat(anchors * num_images)
+        ious = matched_pairwise_iou(anchors, Boxes(gt_boxes))
+
+        positive_samples = torch.where(ious > iou_thr)[0].tolist()
+        if len(positive_samples) == 0:
+            positive_samples = ious.topk(5).indices.tolist()
+        num_samples = min(len(positive_samples), num_samples)
+        positive_samples = random.sample(positive_samples, k=num_samples)
+
+        targets = self._get_geometric_targets(anchors[positive_samples],
+                                              gt_boxes[positive_samples])
+        preds = pred_objectness_logits[positive_samples]
+
+        objectness_loss = torch.abs(preds - targets).sum()
+        normalizer = self.batch_size_per_image * num_images    # number of samples
+
+        return objectness_loss / normalizer
+
 
 @PROPOSAL_GENERATOR_REGISTRY.register()
 class IOUCenternessRPN(IOURPN):
