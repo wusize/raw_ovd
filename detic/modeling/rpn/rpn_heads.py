@@ -191,3 +191,77 @@ class AddConvRPNHead(GradRPNHead):
         ret = super().from_config(cfg, input_shape)
         ret.update(obj_convs=cfg.MODEL.RPN.OBJ_CONVS)
         return ret
+
+
+@RPN_HEAD_REGISTRY.register()
+class DisentangleRPNHead(StandardRPNHead):
+    @configurable
+    def __init__(self, **kwargs):
+        grad_scale = kwargs.pop('grad_scale')
+        super().__init__(**kwargs)
+        self.grad_scale = grad_scale
+        in_channels = kwargs.get('in_channels')
+        num_anchors = kwargs.get('num_anchors')
+        box_dim = kwargs.get('box_dim')
+        conv_dims = kwargs.get('conv_dims')
+
+        cur_channels = in_channels
+        # Keeping the old variable names and structure for backwards compatiblity.
+        # Otherwise the old checkpoints will fail to load.
+        self.conv = nn.Identity()     # discard shared convs
+        self.objectness_logits = nn.Sequential()
+        self.anchor_deltas = nn.Sequential()
+
+        for k, conv_dim in enumerate(conv_dims):
+            out_channels = cur_channels if conv_dim == -1 else conv_dim
+            self.objectness_logits.add_module(f"conv{k}",
+                                              self._get_rpn_conv(cur_channels, out_channels))
+            self.anchor_deltas.add_module(f"conv{k}",
+                                          self._get_rpn_conv(cur_channels, out_channels))
+            cur_channels = out_channels
+
+        self.objectness_logits.add_module(f"conv_final",
+                                          nn.Conv2d(cur_channels, num_anchors, kernel_size=1, stride=1))
+        self.anchor_deltas.add_module(f"conv_final",
+                                      nn.Conv2d(cur_channels, num_anchors * box_dim, kernel_size=1, stride=1))
+
+        # Keeping the order of weights initialization same for backwards compatiblility.
+        for layer in self.modules():
+            if isinstance(layer, nn.Conv2d):
+                nn.init.normal_(layer.weight, std=0.01)
+                nn.init.constant_(layer.bias, 0)
+
+    @classmethod
+    def from_config(cls, cfg, input_shape):
+        ret = super().from_config(cfg, input_shape)
+        ret["grad_scale"] = cfg.MODEL.RPN.BCE_GRAD
+        return ret
+
+    def forward(self, features: List[torch.Tensor]):
+        """
+        Args:
+            features (list[Tensor]): list of feature maps
+
+        Returns:
+            list[Tensor]: A list of L elements.
+                Element i is a tensor of shape (N, A, Hi, Wi) representing
+                the predicted objectness logits for all anchors. A is the number of cell anchors.
+            list[Tensor]: A list of L elements. Element i is a tensor of shape
+                (N, A*box_dim, Hi, Wi) representing the predicted "deltas" used to transform anchors
+                to proposals.
+        """
+        pred_objectness_logits = []
+        pred_anchor_deltas = []
+        for x in features:
+            t = self.conv(x)
+            pred_objectness_logits.append(self._forward_objectness_logits(t))
+            pred_anchor_deltas.append(self.anchor_deltas(t))
+        return pred_objectness_logits, pred_anchor_deltas
+
+    def _forward_objectness_logits(self, feature):
+        if self.training:
+            if self.grad_scale > 0.0:
+                feature = _ScaleGradient.apply(feature, self.grad_scale)
+            else:
+                feature = feature.detach()
+        return self.objectness_logits(feature)

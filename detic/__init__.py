@@ -7,7 +7,7 @@ from .modeling.roi_heads import (res5_roi_heads, standard_roi_heads,
 from .modeling.backbone import swintransformer
 from .modeling.backbone import timm
 from .modeling.rpn.custom_rpn import CustomRPN
-from .modeling.rpn.rpn_heads import CustomRPNHead, GradRPNHead, AddConvRPNHead
+from .modeling.rpn.rpn_heads import CustomRPNHead, GradRPNHead, AddConvRPNHead, DisentangleRPNHead
 from .modeling.rpn.oln_rpn import OLNRPN
 from .modeling.meta_arch.custom_rcnn_v2 import CustomRCNNV2
 from .modeling.rpn.iou_rpn import IOURPN, CenternessRPN, IOUCenternessRPN
