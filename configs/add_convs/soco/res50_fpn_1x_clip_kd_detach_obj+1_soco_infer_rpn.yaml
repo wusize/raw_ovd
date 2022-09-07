@@ -49,3 +49,5 @@ SOLVER:
   CHECKPOINT_PERIOD: 90000
 TEST:
   EVAL_PERIOD: 10000
+DATASETS:
+  TEST: ("coco_not_zeroshot_val", "coco_zeroshot_val")
