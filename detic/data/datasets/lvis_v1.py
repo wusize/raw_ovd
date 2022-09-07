@@ -118,6 +118,7 @@ def custom_load_lvis_json(json_file, image_root, dataset_name=None):
 _CUSTOM_SPLITS_LVIS = {
     "lvis_v1_train+coco": ("coco/", "lvis/lvis_v1_train+coco_mask.json"),
     "lvis_v1_train_norare": ("coco/", "lvis/lvis_v1_train_norare.json"),
+    "lvis_v1_train_rare": ("coco/", "lvis/lvis_v1_train_rare_anns_and_imgs.json"),
 }
 
 
