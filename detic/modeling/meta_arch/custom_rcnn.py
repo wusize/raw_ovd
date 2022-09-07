@@ -136,11 +136,12 @@ class CustomRCNN(GeneralizedRCNN):
         images = self.preprocess_image(batched_inputs)
         clip_images = self.clip_preprocess_image(batched_inputs)
 
-        ann_types = [b.get('ann_type', 'with_instance') for b in batched_inputs]
+        # ann_types = [b.get('ann_type', 'with_instance') for b in batched_inputs]
         image_info = {b['image_id']: dict(captions=b.get('captions', []),
                                           pos_category_ids=b.get('pos_category_ids', [])) for b in batched_inputs}
         image_info = OrderedDict(image_info)
         gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
+        ann_types = ['with_instance' if len(inst) > 0 else 'only_caption' for inst in gt_instances]
         storage = get_event_storage()
         tik = time()
         features = self.forward_backbone(images.tensor)
