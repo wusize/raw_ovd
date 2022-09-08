@@ -134,9 +134,10 @@ class CustomStandardROIHeads(StandardROIHeads):
             )
             added_instances, group_info = self.context_modeling.sample(proposals_per_image, self.mask_on)
             if 'checkborad_group_info' in group_info:
-                group_info['checkborad_group_info'].update(
-                    gts=targets_per_image,
-                    proposals=added_instances[added_instances.sample_types == 1])
+                if group_info['checkborad_group_info'] is not None:
+                    group_info['checkborad_group_info'].update(
+                        gts=targets_per_image,
+                        proposals=added_instances[added_instances.sample_types == 1])
             group_infos.append(group_info)
             # sample type: -1 for topk; 0 for det; 1 for clip-img; 2 for caption
 
