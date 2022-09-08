@@ -74,7 +74,7 @@ class IOURPN(CustomRPN):
 
         targets = self._get_geometric_targets(anchors[positive_samples],
                                               gt_boxes[positive_samples])
-        preds = pred_objectness_logits[positive_samples]
+        preds = pred_objectness_logits[positive_samples].sigmoid()
 
         objectness_loss = torch.abs(preds - targets).sum()     # use L1 loss for continuous value
         normalizer = self.batch_size_per_image * num_images
