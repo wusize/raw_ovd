@@ -205,3 +205,6 @@ def add_detic_config(cfg):
     _C.CONTEXT_MODELLING.VERSION = ""
     _C.CONTEXT_MODELLING.WORD_EMBEDDINGS = "datasets/metadata/coco_clip_4_word_embeddings.pth"
     _C.CONTEXT_MODELLING.GT_THR = 0.5
+
+    _C.MODEL.RPN.CLS_LOSS_WEIGHT = 1.0
+    _C.MODEL.RPN.IOU_LOSS_WEIGHT = 1.0
