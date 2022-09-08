@@ -428,6 +428,8 @@ class ContextModelling(nn.Module):
         similarity_matrix_0[:, :num_queries][label_mask] = float('-inf')
         if global_image_feature_img_ids.shape[0] > 0:
             img_id_mask_0 = img_ids[:, None] == global_image_feature_img_ids[None]
+            if similarity_matrix_0[:, num_queries:].shape != img_id_mask_0.shape:
+                import pdb; pdb.set_trace()   # enable debug
             similarity_matrix_0[:, num_queries:][img_id_mask_0] = float('-inf')
         # image features as queries
         text_keys = torch.cat([clip_text_features, global_clip_text_features[..., :-1]], dim=0)
