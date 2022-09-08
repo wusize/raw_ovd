@@ -171,6 +171,10 @@ class IOURPN(CustomRPN):
 
         return objectness_loss / normalizer
 
+    @staticmethod
+    def _get_geometric_targets(anchors, gt_boxes):
+        return matched_pairwise_iou(anchors, Boxes(gt_boxes))
+
 
 def _dense_box_regression_loss(
     anchors: List[Union[Boxes, torch.Tensor]],
