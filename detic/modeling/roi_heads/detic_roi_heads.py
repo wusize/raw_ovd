@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from time import time
 from detectron2.config import configurable
-from .context_modelling import ContextModelling
+from detic.modeling.context_modelling.context_modelling import ContextModelling
 from .utils import multi_apply
 import torch.nn.functional as F
 from detectron2.modeling.proposal_generator.proposal_utils \

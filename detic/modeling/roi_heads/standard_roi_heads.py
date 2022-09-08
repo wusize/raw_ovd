@@ -6,12 +6,11 @@ import numpy as np
 from detectron2.config import configurable
 from detectron2.modeling.roi_heads.roi_heads import ROI_HEADS_REGISTRY, StandardROIHeads
 from .detic_fast_rcnn import DeticFastRCNNOutputLayers
-from torch.nn import functional as F
 from detectron2.utils.events import get_event_storage
 from detectron2.modeling.proposal_generator.proposal_utils \
     import add_ground_truth_to_proposals
 from detectron2.structures import pairwise_iou
-from detic.modeling.roi_heads.context_modelling import ContextModelling
+from detic.modeling import context_modelling
 from time import time
 
 
@@ -29,7 +28,7 @@ class CustomStandardROIHeads(StandardROIHeads):
 
         self.context_modeling_cfg = cfg.CONTEXT_MODELLING
         self.cfg = cfg
-
+        ContextModelling = getattr(context_modelling, f"ContextModelling{self.context_modeling_cfg.VERSION}")
         self.context_modeling = ContextModelling(self.context_modeling_cfg,
                                                  num_words=self.box_predictor.num_words,
                                                  word_embed_dim=self.box_predictor.word_embed_dim,
@@ -134,6 +133,10 @@ class CustomStandardROIHeads(StandardROIHeads):
                 matched_idxs, matched_labels, targets_per_image.gt_classes
             )
             added_instances, group_info = self.context_modeling.sample(proposals_per_image, self.mask_on)
+            if 'checkborad_group_info' in group_info:
+                group_info['checkborad_group_info'].update(
+                    gts=targets_per_image,
+                    proposals=added_instances[added_instances.sample_types == 1])
             group_infos.append(group_info)
             # sample type: -1 for topk; 0 for det; 1 for clip-img; 2 for caption
 
@@ -179,37 +182,3 @@ class CustomStandardROIHeads(StandardROIHeads):
                            proposal_deltas=proposal_deltas)
 
         return predictions
-
-    def image_label_loss(self, resized_image_info):
-        proposals = resized_image_info['proposals']
-        num_imgs = len(proposals)
-        if num_imgs == 0:
-            return None
-        proposals = [p[:self.cfg.MODEL.ROI_BOX_HEAD.WS_NUM_PROPS] for p in proposals]
-        image_labels = resized_image_info['image_labels']
-        max_size_proposals = []
-        for p in proposals:
-            assert len(p) > 0
-            areas = p.proposal_boxes.area()
-            idx = areas.argmax().item()
-            max_size_proposals.append(p[idx:idx + 1])
-        features = resized_image_info['features']
-        features = [features[f] for f in self.box_in_features]
-        box_features = self.box_pooler(features, [x.proposal_boxes for x in max_size_proposals])
-        box_features = self.box_head(box_features)
-        box_features = self.box_predictor.pre_forward(box_features)
-        pseudo_words = self.box_predictor.pred_words(box_features)  # Nx1024 -> Nx4x512
-        scores = self.box_predictor.pred_cls_score(pseudo_words)[..., :-1]  # discard bg
-        targets = torch.zeros_like(scores)
-        loss_weights = torch.ones_like(scores)
-        for i in range(num_imgs):
-            targets[i, image_labels[i]] = 1.0
-            loss_weights[i, image_labels[i]] = self.cfg.MODEL.ROI_BOX_HEAD.IMAGE_POS_WEIGHT
-
-        loss = F.binary_cross_entropy_with_logits(scores, targets, reduction='none')
-        loss = (loss * loss_weights).sum() / (loss_weights.sum() + 1e-12)
-
-        if loss > 100.0:
-            loss = loss * 0.0
-
-        return loss * self.cfg.MODEL.ROI_BOX_HEAD.IMAGE_LOSS_WEIGHT

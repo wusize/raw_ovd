@@ -201,3 +201,7 @@ def add_detic_config(cfg):
                                         'clip_caption_features']
     _C.MODEL.SAVE_PROPOSALS = False
     _C.SAVE_DEBUG_PATH = 'output/save_debug/'
+
+    _C.CONTEXT_MODELLING.VERSION = ""
+    _C.CONTEXT_MODELLING.WORD_EMBEDDINGS = "datasets/metadata/coco_clip_4_word_embeddings.pth"
+    _C.CONTEXT_MODELLING.GT_THR = 0.5
