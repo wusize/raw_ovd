@@ -221,3 +221,5 @@ def add_detic_config(cfg):
     _C.CONTEXT_MODELLING.FOCAL_GAMMA = 2.0
 
     _C.SEED = 50670598
+
+    _C.MODEL.ROI_BOX_HEAD.BG_BIAS = 0.0
