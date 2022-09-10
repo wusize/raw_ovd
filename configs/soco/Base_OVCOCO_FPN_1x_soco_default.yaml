@@ -30,15 +30,13 @@ MODEL:
     NAME: "StandardROIHeads"
     IN_FEATURES: ["p2", "p3", "p4", "p5"]
   ROI_BOX_HEAD:
+    CLS_AGNOSTIC_BBOX_REG: True
+    USE_SIGMOID_CE: True
     NAME: "FastRCNNConvFCHead"
     NUM_CONV: 4
     NUM_FC: 1
     NORM: "SyncBN"
     POOLER_RESOLUTION: 7
-  ROI_MASK_HEAD:
-    NAME: "MaskRCNNConvUpsampleHead"
-    NUM_CONV: 4
-    POOLER_RESOLUTION: 14
 DATASETS:
   TRAIN: ("coco_zeroshot_train_oriorder",)
   TEST: ("coco_generalized_zeroshot_val",)
