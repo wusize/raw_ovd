@@ -214,10 +214,16 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             zero_weight = torch.cat([
                 (self.freq_weight.view(-1) > 1e-4).float(),
                 self.freq_weight.new_ones(1)]) # C + 1
+            # This is problematic! The zero-weight
+            # won't avoid suppressing base classes
+            # loss = F.cross_entropy(
+            #     pred_class_logits, gt_classes,
+            #     weight=zero_weight, reduction="mean")
+            # TODO: use direct mask on the pred_class_logits
+            pred_class_logits[..., zero_weight < 1.0] = float('-inf')
             loss = F.cross_entropy(
-                pred_class_logits, gt_classes, 
-                weight=zero_weight, reduction="mean")
-        elif self.use_fed_loss and (self.freq_weight is not None): # fedloss
+                pred_class_logits, gt_classes, reduction="mean")
+        elif self.use_fed_loss and (self.freq_weight is not None):  # fedloss
             C = pred_class_logits.shape[1] - 1
             appeared = get_fed_loss_inds(
                 gt_classes, 
