@@ -2,7 +2,9 @@ MODEL:
   WEIGHTS: "models/res50_fpn_soco_star_400.pkl"
   PIXEL_MEAN: [ 123.675, 116.280, 103.530 ]
   PIXEL_STD: [ 58.395, 57.120, 57.375 ]
-  META_ARCHITECTURE: "GeneralizedRCNN"
+  PROPOSAL_GENERATOR:
+    NAME: "CustomRPN"
+  META_ARCHITECTURE: "CustomRCNN"
   BACKBONE:
     FREEZE_AT: 0
     NAME: "build_resnet_fpn_backbone"
