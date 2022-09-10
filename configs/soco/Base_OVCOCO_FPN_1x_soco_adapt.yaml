@@ -49,6 +49,10 @@ MODEL:
     NUM_WORDS: 4
     WORD_EMBED_DIM: 512
     CLS_LOSS_WEIGHT: 1.0
+  CLIP:
+    NAME: 'ViT-B/32'
+    USE_IMAGE_ENCODER: False
+    MODEL_ROOT: 'models'
 DATASETS:
   TRAIN: ("coco_zeroshot_train_oriorder",)
   TEST: ("coco_generalized_zeroshot_val",)
@@ -63,5 +67,6 @@ INPUT:
   MIN_SIZE_TRAIN: (640, 672, 704, 736, 768, 800)
 VERSION: 2
 TEST:
+  EVAL_PERIOD: 10000
   PRECISE_BN:
     ENABLED: True
