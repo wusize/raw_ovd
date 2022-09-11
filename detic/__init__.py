@@ -6,7 +6,7 @@ from .modeling.roi_heads import res5_roi_heads, standard_roi_heads
 from .modeling.backbone import swintransformer
 from .modeling.backbone import timm
 from .modeling.rpn.custom_rpn import CustomRPN
-
+from .modeling.rpn.iou_rpn import IOURPN
 
 from .data.datasets import lvis_v1
 from .data.datasets import imagenet
