@@ -62,4 +62,8 @@ class ZeroShotClassifier(nn.Module):
         x = torch.mm(x, zs_weight)
         if self.use_bias and self.training:
             x = x + self.cls_bias
+        if self.cfg.MODEL.ROI_BOX_HEAD.BG_BIAS > 0.0:
+            assert not self.use_bias
+            assert not self.cfg.MODEL.ROI_BOX_HEAD.USE_SIGMOID_CE
+            x[..., -1] = x[..., -1] + self.cfg.MODEL.ROI_BOX_HEAD.BG_BIAS
         return x
