@@ -220,7 +220,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             #     pred_class_logits, gt_classes,
             #     weight=zero_weight, reduction="mean")
             # TODO: use direct mask on the pred_class_logits
-            pred_class_logits[..., zero_weight < 1.0] = float('-inf')
+            pred_class_logits[..., zero_weight < 1.0] = -self.cls_score.norm_temperature
             loss = F.cross_entropy(
                 pred_class_logits, gt_classes, reduction="mean")
         elif self.use_fed_loss and (self.freq_weight is not None):  # fedloss
