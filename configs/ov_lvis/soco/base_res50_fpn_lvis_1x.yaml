@@ -45,7 +45,7 @@ MODEL:
     USE_BIAS: 0.0
     CLS_AGNOSTIC_BBOX_REG: True
     USE_ZEROSHOT_CLS: True
-    USE_SIGMOID_CE: True
+    USE_SIGMOID_CE: False
     USE_FED_LOSS: False
     IGNORE_ZERO_CATS: True
     ZEROSHOT_WEIGHT_PATH: 'datasets/metadata/lvis_v1_clip_att12.npy'
