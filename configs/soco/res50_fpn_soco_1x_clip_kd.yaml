@@ -1,9 +1,5 @@
 _BASE_: "./Base_OVCOCO_FPN_1x_soco.yaml"
 MODEL:
-  ROI_BOX_HEAD:
-    RANDOM_DROPOUT: 0.5
-    NORM_TEMP: 25.0
-    USE_BIAS: -20.0
   PROPOSAL_GENERATOR:
     NAME: "CustomRPN"
   CLIP:
