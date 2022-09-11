@@ -63,15 +63,15 @@ class ZeroShotClassifier(nn.Module):
             x: B x D'
             classifier_info: (C', C' x D)
         '''
-        zs_weight = self.zs_weight
         if self.cfg.MODEL.ROI_BOX_HEAD.LEARN_BG:
             assert self.cfg.MODEL.ROI_BOX_HEAD.BG_BIAS <= 0.0
             assert not self.cfg.MODEL.ROI_BOX_HEAD.USE_SIGMOID_CE
             input_one = x[0].new_ones(1, 1)
             bg_class_embedding = self.bg_embedding(input_one)
-            bg_class_embedding = F.normalize(bg_class_embedding, p=2, dim=1)  # 1, 512
-            zs_weight[:, -1] = bg_class_embedding[0]   # learnable back_groud
-
+            bg_class_embedding = F.normalize(bg_class_embedding, p=2, dim=1)[0]
+            zs_weight = torch.cat([self.zs_weight[:, :-1], bg_class_embedding[:, None]], dim=-1)
+        else:
+            zs_weight = self.zs_weight
         x = self.norm_temperature * F.normalize(x, p=2, dim=1)
         x = torch.mm(x, zs_weight)
         if self.use_bias and self.training:
