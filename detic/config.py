@@ -202,3 +202,4 @@ def add_detic_config(cfg):
     _C.MODEL.SAVE_PROPOSALS = False
     _C.SAVE_DEBUG_PATH = 'output/save_debug/'
     _C.MODEL.ROI_BOX_HEAD.BG_BIAS = 0.0
+    _C.MODEL.ROI_BOX_HEAD.LEARN_BG = False

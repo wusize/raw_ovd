@@ -37,6 +37,12 @@ class ZeroShotClassifier(nn.Module):
         zs_weight = F.normalize(zs_weight, p=2, dim=0)
         
         self.register_buffer('zs_weight', zs_weight)
+        if self.cfg.MODEL.ROI_BOX_HEAD.LEARN_BG:
+            assert self.cfg.MODEL.ROI_BOX_HEAD.BG_BIAS <= 0.0
+            assert not self.cfg.MODEL.ROI_BOX_HEAD.USE_SIGMOID_CE
+            self.bg_embedding = nn.Linear(1, zs_weight_dim)
+            nn.init.xavier_uniform_(self.bg_embedding.weight)
+            nn.init.constant_(self.bg_embedding.bias, 0)
 
         assert self.zs_weight.shape[1] == num_classes + 1, self.zs_weight.shape
 
@@ -58,6 +64,14 @@ class ZeroShotClassifier(nn.Module):
             classifier_info: (C', C' x D)
         '''
         zs_weight = self.zs_weight
+        if self.cfg.MODEL.ROI_BOX_HEAD.LEARN_BG:
+            assert self.cfg.MODEL.ROI_BOX_HEAD.BG_BIAS <= 0.0
+            assert not self.cfg.MODEL.ROI_BOX_HEAD.USE_SIGMOID_CE
+            input_one = x[0].new_ones(1, 1)
+            bg_class_embedding = self.bg_embedding(input_one)
+            bg_class_embedding = F.normalize(bg_class_embedding, p=2, dim=1)  # 1, 512
+            zs_weight[:, -1] = bg_class_embedding[0]   # learnable back_groud
+
         x = self.norm_temperature * F.normalize(x, p=2, dim=1)
         x = torch.mm(x, zs_weight)
         if self.use_bias and self.training:
@@ -65,5 +79,6 @@ class ZeroShotClassifier(nn.Module):
         if self.cfg.MODEL.ROI_BOX_HEAD.BG_BIAS > 0.0:
             assert not self.use_bias
             assert not self.cfg.MODEL.ROI_BOX_HEAD.USE_SIGMOID_CE
+            assert not self.cfg.MODEL.ROI_BOX_HEAD.LEARN_BG
             x[..., -1] = x[..., -1] + self.cfg.MODEL.ROI_BOX_HEAD.BG_BIAS
         return x
