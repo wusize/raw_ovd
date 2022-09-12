@@ -360,6 +360,7 @@ class ContextModelling(nn.Module):
                          predictions, clip_images,
                          clip_model,
                          image_info=None):
+        image_ids = [im['image_id'] for im in image_info]
         pseudo_words = predictions.pop('kd_pseudo_words')
         device = pseudo_words.device
         storage = get_event_storage()
@@ -417,7 +418,7 @@ class ContextModelling(nn.Module):
         # mask same synced_img
         img_ids = [torch.tensor(sum(b) * [img_id])
                    for b, img_id in zip(seqs_split_split_by_origin,
-                                        image_info.keys())]
+                                        image_ids)]
         img_ids = torch.cat(img_ids).to(device)
         global_text_feature_img_ids = global_clip_text_features[..., -1]
         global_image_feature_img_ids = global_clip_image_features[..., -1]
@@ -429,7 +430,7 @@ class ContextModelling(nn.Module):
         if global_image_feature_img_ids.shape[0] > 0:
             img_id_mask_0 = img_ids[:, None] == global_image_feature_img_ids[None]
             assert similarity_matrix_0[:, num_queries:].shape == img_id_mask_0.shape, \
-                f"image_ids: {img_ids}, {list(image_info.keys())}, {len(seqs_split_split_by_origin)}"
+                f"image_ids: {img_ids}, {image_ids}, {len(seqs_split_split_by_origin)}"
             similarity_matrix_0[:, num_queries:][img_id_mask_0] = float('-inf')
         # image features as queries
         text_keys = torch.cat([clip_text_features, global_clip_text_features[..., :-1]], dim=0)
@@ -456,7 +457,7 @@ class ContextModelling(nn.Module):
             preds_split_by_batch = [n.shape[0] for n in normed_boxes]
             img_ids = [torch.tensor(b * [img_id])
                        for b, img_id in zip(preds_split_by_batch,
-                                            image_info.keys())]
+                                            image_ids)]
             img_ids = torch.cat(img_ids).to(device)
             normed_boxes = torch.cat(normed_boxes, dim=0).split(preds_split_by_perms, dim=0)
             clip_patch_features = F.normalize(roi_align(
@@ -535,12 +536,13 @@ class ContextModelling(nn.Module):
         return caption_features, num_captions_per_image
 
     def caption_contrast(self, caption_normed_boxes, predictions, clip_model, image_info):
+        image_ids = [im['image_id'] for im in image_info]
         clip_model.eval()
         batch_size = len(caption_normed_boxes)
         caption_pseudo_words = predictions.pop('caption_pseudo_words')
         device = caption_pseudo_words.device
         all_clip_caption_features, num_captions_per_image = self.get_caption_features([v['captions']
-                                                                                       for v in image_info.values()],
+                                                                                       for v in image_info],
                                                                                       device,
                                                                                       clip_model)
 
@@ -582,7 +584,7 @@ class ContextModelling(nn.Module):
         if all_clip_caption_features is None:
             caption_valid = torch.zeros(batch_size, device=device)
             clip_caption_features = torch.zeros(batch_size, 512, device=device)
-            caption_img_ids = torch.tensor(list(image_info.keys()), device=device,
+            caption_img_ids = torch.tensor(image_ids, device=device,
                                            dtype=torch.float32)
         else:
             caption_valid = []
@@ -590,7 +592,7 @@ class ContextModelling(nn.Module):
             clip_caption_features_list = []
             caption_img_ids = []
             max_caps = self.caption_cfg.CAPS_PER_IMG
-            for img_id, num_cap, cap_feat in zip(image_info.keys(),
+            for img_id, num_cap, cap_feat in zip(image_ids,
                                                  num_captions_per_image, clip_caption_features):
                 assert num_cap == cap_feat.shape[0]
                 if num_cap > 0:
@@ -607,7 +609,7 @@ class ContextModelling(nn.Module):
             clip_caption_features = torch.cat(clip_caption_features_list)
             caption_img_ids = torch.cat(caption_img_ids)
         pred_image_ids = torch.tensor([k for num_perms, k in zip(num_perms_per_image,
-                                                                 image_info.keys()) for _ in range(num_perms)],
+                                                                 image_ids) for _ in range(num_perms)],
                                       device=device)
         num_preds = clip_text_features.shape[0]
         assert sum(num_perms_per_image) == num_preds
@@ -630,7 +632,7 @@ class ContextModelling(nn.Module):
         if all_clip_caption_features is None:
             clip_caption_features_update = -torch.ones(1, 512 + 1, device=device)
         else:
-            all_cap_image_ids = [img_id for img_id, num_cap in zip(image_info.keys(), num_captions_per_image)
+            all_cap_image_ids = [img_id for img_id, num_cap in zip(image_ids, num_captions_per_image)
                                  for _ in range(num_cap)]
             all_cap_image_ids = torch.tensor(all_cap_image_ids,
                                              device=device, dtype=torch.float32).view(-1, 1)
