@@ -72,3 +72,4 @@ TEST:
   PRECISE_BN:
     ENABLED: True
 OUTPUT_DIR: "./output/Detic-COCO/auto"
+FP16: True
