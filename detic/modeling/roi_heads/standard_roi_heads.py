@@ -1,6 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 from detectron2.structures.instances import Instances
-from detectron2.structures.boxes import Boxes
+from detectron2.structures import Boxes, PolygonMasks
 import torch
 import numpy as np
 from detectron2.config import configurable
@@ -13,6 +13,7 @@ from detectron2.modeling.proposal_generator.proposal_utils \
 from detectron2.structures import pairwise_iou
 from detic.modeling.roi_heads.context_modelling import ContextModelling
 from time import time
+from detectron2.modeling.roi_heads.roi_heads import select_foreground_proposals
 
 
 @ROI_HEADS_REGISTRY.register()
@@ -213,3 +214,48 @@ class CustomStandardROIHeads(StandardROIHeads):
             loss = loss * 0.0
 
         return loss * self.cfg.MODEL.ROI_BOX_HEAD.IMAGE_LOSS_WEIGHT
+
+    # TODO: resolve bugs when there is no annotation
+    def _forward_mask(self, features, instances):
+        """
+        Forward logic of the mask prediction branch.
+        Args:
+            features (dict[str, Tensor]): mapping from feature map names to tensor.
+                Same as in :meth:`ROIHeads.forward`.
+            instances (list[Instances]): the per-image instances to train/predict masks.
+                In training, they can be the proposals.
+                In inference, they can be the boxes predicted by R-CNN box head.
+        Returns:
+            In training, a dict of losses.
+            In inference, update `instances` with new fields "pred_masks" and return it.
+        """
+        if not self.mask_on:
+            return {} if self.training else instances
+
+        if self.training:
+            # head is only trained on positive proposals.
+            instances, _ = select_foreground_proposals(instances, self.num_classes)
+        assert self.mask_pooler is not None
+        features = [features[f] for f in self.mask_in_features]
+        boxes = [x.proposal_boxes if self.training else x.pred_boxes for x in instances]
+        num_boxes = sum([len(b) for b in boxes])
+
+        # when number of positive proposals is 0, set pseudo mask
+        if self.training and num_boxes == 0:
+            # make pseudo-boxes and pseudo-masks
+            h, w = instances[0].image_size
+            pseudo_boxes = [Boxes(torch.tensor([[0.0, 0.0, w-1, h-1],
+                                                ]).to(features[0].device))]
+            pseudo_instances = [Instances(image_size=(h, w),
+                                          proposal_boxes=pseudo_boxes[0],
+                                          gt_classes=torch.arange(1).to(features[0].device),
+                                          gt_masks=PolygonMasks(
+                                              [[np.asarray([0.0, 0.0, 0.0, 1.0, 1.0, 0.0]), ], ]))]
+            pseudo_features = self.mask_pooler([f[:1] for f in features], pseudo_boxes)
+            pseudo_losses = self.mask_head(pseudo_features, pseudo_instances)
+            for k, v in pseudo_losses.items():
+                pseudo_losses[k] = v * 0.0
+            return pseudo_losses
+
+        features = self.mask_pooler(features, boxes)
+        return self.mask_head(features, instances)

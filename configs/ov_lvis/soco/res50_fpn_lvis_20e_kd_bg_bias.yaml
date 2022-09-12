@@ -1,4 +1,4 @@
-_BASE_: "./base_res50_fpn_lvis_20e.yaml"
+_BASE_: "./base_res50_fpn_lvis_20e_bg_bias.yaml"
 MODEL:
   CLIP:
     USE_IMAGE_ENCODER: True
