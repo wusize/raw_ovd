@@ -224,7 +224,8 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
                 pos_preds = gt_classes < self.num_classes
                 if pos_preds.sum() > 0:
                     simi = self.similarity_matrix[gt_classes[pos_preds]]
-                    pred_class_logits[pos_preds, zero_weight < 1.0] = \
+                    assert simi.shape == pred_class_logits[pos_preds].shape
+                    pred_class_logits[pos_preds][:, zero_weight < 1.0] = \
                         simi[:, zero_weight < 1.0] * self.cls_score.norm_temperature
             loss = F.cross_entropy(
                 pred_class_logits, gt_classes, reduction="mean")
