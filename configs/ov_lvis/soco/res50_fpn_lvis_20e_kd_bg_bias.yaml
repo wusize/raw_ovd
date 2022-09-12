@@ -31,3 +31,5 @@ CONTEXT_MODELLING:
     NAMES: ['clip_text_features', 'clip_image_features', 'clip_word_features', 'clip_patch_features']
 TEST:
   EVAL_PERIOD: 30000
+DATALOADER:
+  FILTER_EMPTY_ANNOTATIONS: False
