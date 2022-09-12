@@ -201,5 +201,7 @@ def add_detic_config(cfg):
                                         'clip_caption_features']
     _C.MODEL.SAVE_PROPOSALS = False
     _C.SAVE_DEBUG_PATH = 'output/save_debug/'
-    _C.MODEL.ROI_BOX_HEAD.BG_BIAS = 0.0
-    _C.MODEL.ROI_BOX_HEAD.LEARN_BG = False
+    _C.MODEL.ROI_BOX_HEAD.BG_BIAS = False
+    _C.MODEL.ROI_BOX_HEAD.LEARN_BG = True
+    _C.MODEL.ROI_BOX_HEAD.MASK_VALUE = -50.0  # -norm_temp as default
+    _C.MODEL.ROI_BOX_HEAD.MASK_FOR_POS = False   # whether to use gt similarity as the mask for positive samples

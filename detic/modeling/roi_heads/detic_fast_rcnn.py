@@ -102,6 +102,10 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         nn.init.constant_(self.bbox_pred[-1].bias, 0)
 
         self.word_dropout = self.cfg.MODEL.ROI_BOX_HEAD.RANDOM_DROPOUT
+        if self.cfg.MODEL.ROI_BOX_HEAD.MASK_FOR_POS:
+            cls_features = self.cls_score.zs_weight   # note that the last row and col is bg(0)
+            similarity_matrix = cls_features.T @ cls_features
+            self.register_buffer('similarity_matrix', similarity_matrix)
 
     @classmethod
     def from_config(cls, cfg, input_shape):
@@ -213,14 +217,15 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         if self.ignore_zero_cats and (self.freq_weight is not None):
             zero_weight = torch.cat([
                 (self.freq_weight.view(-1) > 1e-4).float(),
-                self.freq_weight.new_ones(1)]) # C + 1
-            # This is problematic! The zero-weight
-            # won't avoid suppressing base classes
-            # loss = F.cross_entropy(
-            #     pred_class_logits, gt_classes,
-            #     weight=zero_weight, reduction="mean")
+                self.freq_weight.new_ones(1)])  # C + 1
             # TODO: use direct mask on the pred_class_logits
-            pred_class_logits[..., zero_weight < 1.0] = -self.cls_score.norm_temperature
+            pred_class_logits[..., zero_weight < 1.0] = self.cfg.MODEL.ROI_BOX_HEAD.MASK_VALUE
+            if self.cfg.MODEL.ROI_BOX_HEAD.MASK_FOR_POS:
+                pos_preds = gt_classes < self.num_classes
+                if pos_preds.sum() > 0:
+                    simi = self.similarity_matrix[gt_classes[pos_preds]]
+                    pred_class_logits[pos_preds, zero_weight < 1.0] = \
+                        simi[:, zero_weight < 1.0] * self.cls_score.norm_temperature
             loss = F.cross_entropy(
                 pred_class_logits, gt_classes, reduction="mean")
         elif self.use_fed_loss and (self.freq_weight is not None):  # fedloss
