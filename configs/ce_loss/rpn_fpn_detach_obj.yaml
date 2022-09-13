@@ -1,0 +1,7 @@
+_BASE_: "./res50_fpn_1x_clip_kd_ce_detach_obj.yaml"
+MODEL:
+  META_ARCHITECTURE: "ProposalNetwork"
+  PROPOSAL_GENERATOR:
+    NAME: "RPN"
+DATASETS:
+  TEST: ("coco_zeroshot_val", "coco_not_zeroshot_val")
