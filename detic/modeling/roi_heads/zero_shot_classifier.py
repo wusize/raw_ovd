@@ -4,6 +4,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from detectron2.config import configurable
+from detectron2.utils.events import get_event_storage
 
 
 class ZeroShotClassifier(nn.Module):
@@ -84,4 +85,6 @@ class ZeroShotClassifier(nn.Module):
             assert not self.cfg.MODEL.ROI_BOX_HEAD.USE_SIGMOID_CE
             assert not self.cfg.MODEL.ROI_BOX_HEAD.LEARN_BG
             x[..., -1] = x[..., -1] + self.bg_bias
+            storage = get_event_storage()
+            storage.put_scalar("background/bg_bias", self.bg_bias.detach().cpu().numpy())
         return x
