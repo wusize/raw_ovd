@@ -1,16 +1,28 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 from typing import Dict, List, Optional
 import torch
-from detectron2.structures import ImageList, Instances, Boxes
+from detectron2.structures import ImageList, Instances
 from detectron2.modeling.proposal_generator.build import PROPOSAL_GENERATOR_REGISTRY
-from detectron2.modeling.proposal_generator.rpn import RPN, _dense_box_regression_loss
+from detectron2.modeling.proposal_generator.rpn import RPN
 from detectron2.layers import cat
 import torch.nn.functional as F
-from detectron2.utils.events import get_event_storage
+from detectron2.config import configurable
 
 
 @PROPOSAL_GENERATOR_REGISTRY.register()
 class DisentangleRPN(RPN):
+    @configurable
+    def __init__(self, **kwargs):
+        pos_loss_weight = kwargs.pop("pos_loss_weight")
+        super().__init__(**kwargs)
+        self.pos_loss_weight = pos_loss_weight
+
+    @classmethod
+    def from_config(cls, cfg, input_shape):
+        ret = super().from_config(cfg, input_shape)
+        ret['pos_loss_weight'] = cfg.MODEL.RPN.POS_LOSS_WEIGHT
+        return ret
+
     def forward(
         self,
         images: ImageList,
@@ -40,20 +52,23 @@ class DisentangleRPN(RPN):
                 for i, ann_type in enumerate(ann_types):
                     if ann_type not in ['with_instance']:
                         gt_labels[i][:] = -1
-                pred_objectness_logits_detach = [           # detached
+                pred_objectness_logits_detached = [           # detached
                     # (N, A, Hi, Wi) -> (N, Hi, Wi, A) -> (N, Hi*Wi*A)
                     score[0].permute(0, 2, 3, 1).flatten(1)
                     for score in pred_objectness_logits
                 ]
-                pred_objectness_logits = [             # not detached
+                pred_objectness_logits_undetached = [             # not detached
                     # (N, A, Hi, Wi) -> (N, Hi, Wi, A) -> (N, Hi*Wi*A)
                     score[1].permute(0, 2, 3, 1).flatten(1)
                     for score in pred_objectness_logits
                 ]
                 losses = self.losses(
-                    anchors, pred_objectness_logits, pred_objectness_logits_detach,
+                    anchors, pred_objectness_logits_detached,
                     gt_labels, pred_anchor_deltas, gt_boxes,
                 )
+                losses.update(self.pos_losses(
+                    gt_labels, pred_objectness_logits_undetached))
+                pred_objectness_logits = pred_objectness_logits_detached
             else:
                 pred_objectness_logits = [
                     # (N, A, Hi, Wi) -> (N, Hi, Wi, A) -> (N, Hi*Wi*A)
@@ -73,55 +88,20 @@ class DisentangleRPN(RPN):
         )
         return proposals, losses
 
-    @torch.jit.unused
-    def losses(
+    def pos_losses(
         self,
-        anchors: List[Boxes],
-        pred_objectness_logits_pos: List[torch.Tensor],
-        pred_objectness_logits_neg: List[torch.Tensor],
-        gt_labels: List[torch.Tensor],
-        pred_anchor_deltas: List[torch.Tensor],
-        gt_boxes: List[torch.Tensor],
-    ) -> Dict[str, torch.Tensor]:
-        num_images = len(gt_labels)
-        gt_labels = torch.stack(gt_labels)  # (N, sum(Hi*Wi*Ai))
+        gt_labels,
+        pred_objectness_logits: List[torch.Tensor],
+    ):
+        gt_labels = torch.stack(gt_labels)
+        pos_mask = gt_labels > 0
+        if pos_mask.sum() == 0:
+            return dict(pos_aux_loss=pred_objectness_logits[0].min() * 0.0)    # return 0 loss
 
-        # Log the number of positive/negative anchors per-image that's used in training
-        pos_mask = gt_labels == 1
-        num_pos_anchors = pos_mask.sum().item()
-        num_neg_anchors = (gt_labels == 0).sum().item()
-        storage = get_event_storage()
-        storage.put_scalar("rpn/num_pos_anchors", num_pos_anchors / num_images)
-        storage.put_scalar("rpn/num_neg_anchors", num_neg_anchors / num_images)
-
-        localization_loss = _dense_box_regression_loss(
-            anchors,
-            self.box2box_transform,
-            pred_anchor_deltas,
-            gt_boxes,
-            pos_mask,
-            box_reg_loss_type=self.box_reg_loss_type,
-            smooth_l1_beta=self.smooth_l1_beta,
+        pos_aux_loss = F.binary_cross_entropy_with_logits(
+            cat(pred_objectness_logits, dim=1)[pos_mask],
+            gt_labels[pos_mask].to(torch.float32),    # all ones
+            reduction="mean",
         )
 
-        neg_mask = gt_labels == 0
-
-        pos_pred_logits = cat(pred_objectness_logits_pos, dim=1)[pos_mask]
-        neg_pred_logits = cat(pred_objectness_logits_neg, dim=1)[neg_mask]
-        pos_labels = gt_labels[pos_mask].to(torch.float32)
-        neg_labels = gt_labels[neg_mask].to(torch.float32)
-
-        objectness_loss = F.binary_cross_entropy_with_logits(
-            cat([pos_pred_logits, neg_pred_logits]),
-            cat([pos_labels, neg_labels]),
-            reduction="sum",
-        )
-        normalizer = self.batch_size_per_image * num_images
-        losses = {
-            "loss_rpn_cls": objectness_loss / normalizer,
-            # The original Faster R-CNN paper uses a slightly different normalizer
-            # for loc loss. But it doesn't matter in practice
-            "loss_rpn_loc": localization_loss / normalizer,
-        }
-        losses = {k: v * self.loss_weight.get(k, 1.0) for k, v in losses.items()}
-        return losses
+        return {"pos_aux_loss": self.pos_loss_weight * pos_aux_loss}

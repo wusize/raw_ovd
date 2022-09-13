@@ -205,3 +205,5 @@ def add_detic_config(cfg):
     _C.MODEL.ROI_BOX_HEAD.LEARN_BG = True
     _C.MODEL.ROI_BOX_HEAD.MASK_VALUE = -50.0  # -norm_temp as default
     _C.MODEL.ROI_BOX_HEAD.MASK_FOR_POS = False   # whether to use gt similarity as the mask for positive samples
+
+    _C.MODEL.RPN.POS_LOSS_WEIGHT = 0.1
