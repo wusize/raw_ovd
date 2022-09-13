@@ -7,7 +7,8 @@ from .modeling.backbone import swintransformer
 from .modeling.backbone import timm
 from .modeling.rpn.custom_rpn import CustomRPN
 from .modeling.rpn.iou_rpn import IOURPN
-from .modeling.rpn.rpn_heads import DetachRPNHead
+from .modeling.rpn.disentangle_rpn import DisentangleRPN
+from .modeling.rpn.rpn_heads import DetachRPNHead, DisentangleRPNHead
 
 from .data.datasets import lvis_v1
 from .data.datasets import imagenet

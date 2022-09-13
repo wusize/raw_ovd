@@ -40,3 +40,13 @@ class DetachRPNHead(StandardRPNHead):
 
     def _forward_objectness_logits(self, feature):
         return self.objectness_logits(feature.detach())
+
+
+@RPN_HEAD_REGISTRY.register()
+class DisentangleRPNHead(DetachRPNHead):
+    def _forward_objectness_logits(self, feature):
+        if self.training:
+            return self.objectness_logits(feature.detach()), \
+                   self.objectness_logits(feature)        # bg, fg
+        else:
+            return self.objectness_logits(feature)
