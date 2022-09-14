@@ -374,10 +374,15 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             pseudo_text, end_token_ids = clip_model.prepare_pseudo_text_tensor(
                 pseudo_words.half(), valid_mask)  # add start and stop token
             # assert attn_mask.shape[:2] == pseudo_words.shape[:2]
-            cls_features, x, end_token_ids = \
-                clip_model.encode_pseudo_text_endk(pseudo_text, end_token_ids,
-                                                   text_pe=True,
-                                                   stepk=12, normalize=True)
+            if self.cfg.MODEL.ROI_BOX_HEAD.ALL_ENCODER:
+                cls_features = \
+                    clip_model.encode_pseudo_text(pseudo_text, end_token_ids,
+                                                  text_pe=True, normalize=True)
+            else:
+                cls_features, _, _ = \
+                    clip_model.encode_pseudo_text_endk(pseudo_text, end_token_ids,
+                                                       text_pe=True,
+                                                       stepk=12, normalize=True)
             cls_features = cls_features.float()
 
         cls_scores = self.cls_score(cls_features)
