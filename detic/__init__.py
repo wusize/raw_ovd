@@ -9,6 +9,7 @@ from .modeling.rpn.custom_rpn import CustomRPN
 from .modeling.rpn.iou_rpn import IOURPN
 from .modeling.rpn.disentangle_rpn import DisentangleRPN
 from .modeling.rpn.rpn_heads import DetachRPNHead, DisentangleRPNHead
+from .modeling.roi_heads.ensemble_standard_roi_heads import EnsembleStandardROIHeads
 
 from .data.datasets import lvis_v1
 from .data.datasets import imagenet

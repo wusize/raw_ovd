@@ -208,3 +208,5 @@ def add_detic_config(cfg):
 
     _C.MODEL.RPN.POS_LOSS_WEIGHT = 0.1
     _C.MODEL.ROI_BOX_HEAD.ALL_ENCODER = False
+
+    _C.MODEL.ROI_BOX_HEAD.ENSEMBLE_FACTOR = 0.33
