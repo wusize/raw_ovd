@@ -1,0 +1,43 @@
+_BASE_: "./Base_OVCOCO_FPN_1x_soco.yaml"
+MODEL:
+  WEIGHTS: "models/res50_fpn_soco_star_400_ensemble.pkl"
+  RPN:
+    HEAD_NAME: "DetachRPNHead"
+  ROI_HEADS:
+    NAME: EnsembleStandardROIHeads
+  ROI_BOX_HEAD:
+    ALL_ENCODER: True
+    ZEROSHOT_WEIGHT_PATH: 'datasets/metadata/lvis_v1_clip_a+cname.npy'
+  CLIP:
+    USE_IMAGE_ENCODER: True
+
+CONTEXT_MODELLING:
+  ENABLE: True
+  CONTRAST_LOSS_WEIGHT: 1.0
+  TOKEN_LOSS_WEIGHT: 0.1
+  TOPK: 300
+  OBJECTNESS_THR: 0.85
+  SHAPE_RATIO_THR: 0.25
+  POSITIONAL_ENCODING: True
+  CE_TEMP: 30.0
+  TOKEN_TEMP: 50.0
+  CHECKBOARD:
+    ENABLE: True
+    NMS_THR: 0.1
+    AREA_RATIO_THR: 0.01
+    BASE_PROBABILITY: 0.3
+    MAX_GROUPS: 4
+    MAX_PERMUTATIONS: 2
+    ALPHA: 3.0
+    CUT_OFF_THR: 0.3
+    INTERVAL: -0.2
+    LOCAL_CORRESPONDENCE: True
+  CAPTION:
+    ENABLE: False
+  QUEUE:
+    LENGTHS: [1024, 1024, 1024, 1024]
+    NAMES: ['clip_text_features', 'clip_image_features', 'clip_word_features', 'clip_patch_features']
+TEST:
+  EVAL_PERIOD: 30000
+DATALOADER:
+  FILTER_EMPTY_ANNOTATIONS: False
