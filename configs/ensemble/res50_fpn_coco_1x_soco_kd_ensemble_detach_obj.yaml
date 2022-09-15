@@ -7,7 +7,7 @@ MODEL:
     NAME: EnsembleStandardROIHeads
   ROI_BOX_HEAD:
     ALL_ENCODER: True
-    ZEROSHOT_WEIGHT_PATH: 'datasets/metadata/lvis_v1_clip_a+cname.npy'
+    ZEROSHOT_WEIGHT_PATH: "datasets/metadata/coco_clip_a+cname.npy"
   CLIP:
     USE_IMAGE_ENCODER: True
 
@@ -38,6 +38,6 @@ CONTEXT_MODELLING:
     LENGTHS: [1024, 1024, 1024, 1024]
     NAMES: ['clip_text_features', 'clip_image_features', 'clip_word_features', 'clip_patch_features']
 TEST:
-  EVAL_PERIOD: 30000
+  EVAL_PERIOD: 10000
 DATALOADER:
   FILTER_EMPTY_ANNOTATIONS: False
