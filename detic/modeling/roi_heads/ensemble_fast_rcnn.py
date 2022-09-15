@@ -82,7 +82,7 @@ class EnsembleFastRCNNOutputLayers(DeticFastRCNNOutputLayers):
         predictions = dict()
 
         if self.cfg.MODEL.ROI_BOX_HEAD.ENSEMBLE_WORDS:
-            pseudo_words = torch.cat([pseudo_words_cls, pseudo_words_kd],
+            pseudo_words = torch.cat([pseudo_words_kd, pseudo_words_cls],
                                      dim=1)
             scores = self.pred_cls_score(pseudo_words)
             predictions.update(scores=scores)
