@@ -59,11 +59,11 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             bias_value = -math.log((1 - prior_prob) / prior_prob)
             nn.init.constant_(self.cls_score.bias, bias_value)
         
-        if self.use_fed_loss or self.ignore_zero_cats:
-            freq_weight = load_class_freq(cat_freq_path, fed_loss_freq_weight)
-            self.register_buffer('freq_weight', freq_weight)
-        else:
-            self.freq_weight = None
+        # if self.use_fed_loss or self.ignore_zero_cats:
+        freq_weight = load_class_freq(cat_freq_path, fed_loss_freq_weight)
+        self.register_buffer('freq_weight', freq_weight)
+        # else:
+        #     self.freq_weight = None
 
         if self.use_fed_loss and len(self.freq_weight) < self.num_classes:
             # assert self.num_classes == 11493
