@@ -319,18 +319,19 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         # scores, _ = predictions
         scores = predictions.pop('scores')
         num_inst_per_image = [len(p) for p in proposals]
-        if self.cfg.MODEL.ROI_BOX_HEAD.COSINE_SCORE:
-            probs = scores / self.cls_score.norm_temperature
-            w = (self.freq_weight.view(-1) > 1e-4).float()   # base
-            b = (1.0 - w) * self.cfg.MODEL.ROI_BOX_HEAD.NOVEL_BIAS  # novel
-            t = w + (1.0 - w) * self.cfg.MODEL.ROI_BOX_HEAD.NOVEL_TEMP  # novel
-            probs[:, :-1] *= t.view(1, -1)
-            probs[:, :-1] += b.view(1, -1)
+        if self.use_sigmoid_ce:
+            probs = scores.sigmoid()
         else:
-            if self.use_sigmoid_ce:
-                probs = scores.sigmoid()
-            else:
-                probs = F.softmax(scores, dim=-1)
+            probs = F.softmax(scores, dim=-1)
+
+        if self.cfg.MODEL.ROI_BOX_HEAD.NOVEL_FACTOR < 1.0:
+            novel_factor = self.cfg.MODEL.ROI_BOX_HEAD.NOVEL_FACTOR
+
+            novel_classes = torch.cat([
+                (self.freq_weight.view(-1) > 1e-4).float(),
+                self.freq_weight.new_ones(1)]) < 0.5
+            probs[:, novel_classes] = probs[:, novel_classes] ** novel_factor
+
         return probs.split(num_inst_per_image, dim=0)
 
     def pre_forward(self, x):
