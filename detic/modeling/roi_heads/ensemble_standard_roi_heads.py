@@ -258,6 +258,7 @@ class EnsembleStandardROIHeads(StandardROIHeads):
             box_features_cls = self.box_head(box_features[sample_types == 1])
             input_box_features_cls = self.box_predictor.pre_forward(box_features_cls)
             pseudo_words_cls = self.box_predictor.pred_words(input_box_features_cls)[:0]
+            input_box_features_cls = input_box_features_cls[:0]
         else:
             box_features_cls = self.box_head(box_features[sample_types == 0])
             input_box_features_cls = self.box_predictor.pre_forward(box_features_cls)
