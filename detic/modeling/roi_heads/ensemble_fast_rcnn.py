@@ -25,32 +25,43 @@ class EnsembleFastRCNNOutputLayers(DeticFastRCNNOutputLayers):
         """
         support sigmoid
         """
-        # scores, _ = predictions
-        scores = predictions.pop('scores')
-        scores_kd = predictions.pop('scores_kd')
-        # TODO: ensemble the cosine similarity scores
+        if "scores" in predictions:
+            scores = predictions.pop('scores')
+            if self.cfg.MODEL.ROI_BOX_HEAD.COSINE_SCORE:
+                probs = scores.clamp(min=0.0) / self.cls_score.norm_temperature
+            else:
+                if self.use_sigmoid_ce:
+                    probs = scores.sigmoid()
+                else:
+                    probs = F.softmax(scores, dim=-1)
+        else:
+            # scores, _ = predictions
+            scores_cls = predictions.pop('scores_cls')
+            scores_kd = predictions.pop('scores_kd')
+            # TODO: ensemble the cosine similarity scores
 
-        factor = self.cfg.MODEL.ROI_BOX_HEAD.ENSEMBLE_FACTOR
-        assert factor < 0.5
-        is_base = torch.cat([
-            (self.freq_weight.view(-1) > 1e-4).float(),
-            self.freq_weight.new_ones(1)])  # C + 1
+            factor = self.cfg.MODEL.ROI_BOX_HEAD.ENSEMBLE_FACTOR
+            assert factor < 0.5
+            is_base = torch.cat([
+                (self.freq_weight.view(-1) > 1e-4).float(),
+                self.freq_weight.new_ones(1)])  # C + 1
+
+            if self.cfg.MODEL.ROI_BOX_HEAD.COSINE_SCORE:
+                probs_cls = scores_cls.clamp(min=0.0) / self.cls_score.norm_temperature
+                probs_kd = scores_kd.clamp(min=0.0) / self.cls_score.norm_temperature
+            else:
+                if self.use_sigmoid_ce:
+                    probs_cls = scores_cls.sigmoid()
+                    probs_kd = scores_kd.sigmoid()
+                else:
+                    probs_cls = F.softmax(scores_cls, dim=-1)
+                    probs_kd = F.softmax(scores_kd, dim=-1)
+
+            probs_base = (probs_cls ** factor) * (probs_kd ** (1.0 - factor)) * is_base[None]
+            probs_novel = (probs_cls ** (1.0 - factor)) * (probs_kd ** factor) * (1.0 - is_base[None])
+            probs = probs_base + probs_novel
 
         num_inst_per_image = [len(p) for p in proposals]
-        if self.cfg.MODEL.ROI_BOX_HEAD.COSINE_SCORE:
-            probs = scores.clamp(min=0.0) / self.cls_score.norm_temperature
-            probs_kd = scores_kd.clamp(min=0.0) / self.cls_score.norm_temperature
-        else:
-            if self.use_sigmoid_ce:
-                probs = scores.sigmoid()
-                probs_kd = scores_kd.sigmoid()
-            else:
-                probs = F.softmax(scores, dim=-1)
-                probs_kd = F.softmax(scores_kd, dim=-1)
-
-        probs_base = (probs ** factor) * (probs_kd ** (1.0 - factor)) * is_base[None]
-        probs_novel = (probs ** (1.0 - factor)) * (probs_kd ** factor) * (1.0 - is_base[None])
-        probs = probs_base + probs_novel
         return probs.split(num_inst_per_image, dim=0)
 
     def pred_words_kd(self, x):
@@ -63,16 +74,24 @@ class EnsembleFastRCNNOutputLayers(DeticFastRCNNOutputLayers):
         # use clip-text to predict cls feature
 
         x_cls = self.pre_forward(x_cls)
-        pseudo_words = self.pred_words(x_cls)
-        scores = self.pred_cls_score(pseudo_words)
+        pseudo_words_cls = self.pred_words(x_cls)
 
         x_kd = self.pre_forward(x_kd)
         pseudo_words_kd = self.pred_words_kd(x_kd)
-        scores_kd = self.pred_cls_score(pseudo_words_kd)
 
         predictions = dict()
-        predictions.update(scores=scores)
-        predictions.update(scores_kd=scores_kd)
+
+        if self.cfg.MODEL.ROI_BOX_HEAD.ENSEMBLE_WORDS:
+            pseudo_words = torch.cat([pseudo_words_cls, pseudo_words_kd],
+                                     dim=1)
+            scores = self.pred_cls_score(pseudo_words)
+            predictions.update(scores=scores)
+        else:
+            scores_cls = self.pred_cls_score(pseudo_words_cls)
+            scores_kd = self.pred_cls_score(pseudo_words_kd)
+            predictions.update(scores_cls=scores_cls)
+            predictions.update(scores_kd=scores_kd)
+
         predictions.update(proposal_deltas=self.bbox_pred(x_cls))
 
         return predictions
