@@ -110,6 +110,11 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             cls_features = self.cls_score.zs_weight   # note that the last row and col is bg(0)
             similarity_matrix = cls_features.T @ cls_features
             self.register_buffer('similarity_matrix', similarity_matrix)
+        if self.MODEL.ROI_BOX_HEAD.WORD_BACKGROUND:
+            assert self.cfg.MODEL.ROI_BOX_HEAD.LEARN_BG
+            self.bg_embedding = nn.Linear(1, 2 * num_words * word_embed_dim)   # use more words than the foreground
+            nn.init.xavier_uniform_(self.bg_embedding.weight)
+            nn.init.constant_(self.bg_embedding.bias, 0)
 
     @classmethod
     def from_config(cls, cfg, input_shape):
@@ -373,9 +378,21 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         if pseudo_words.shape[0] == 0:
             return pseudo_words.new_zeros(0, self.num_classes + 1)
         clip_model.eval()
+        cls_features = self.forward_clip_text(pseudo_words, clip_model)
+        if self.MODEL.ROI_BOX_HEAD.WORD_BACKGROUND:
+            ones = pseudo_words.new_ones(1, 1)
+            bg_words = self.bg_embedding(ones).view(1, 2 * self.num_words,
+                                                    self.word_embed_dim)
+            bg_feature = self.forward_clip_text(bg_words, clip_model)
+        else:
+            bg_feature = None
+
+        cls_scores = self.cls_score(cls_features, bg_feature)
+        return cls_scores
+
+    def forward_clip_text(self, pseudo_words, clip_model):
         with autocast():
-            if self.word_dropout > 0.0:
-                valid_mask = self._drop_word(pseudo_words.half())
+            valid_mask = self._drop_word(pseudo_words.half())
             pseudo_text, end_token_ids = clip_model.prepare_pseudo_text_tensor(
                 pseudo_words.half(), valid_mask)  # add start and stop token
             # assert attn_mask.shape[:2] == pseudo_words.shape[:2]
@@ -388,10 +405,8 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
                     clip_model.encode_pseudo_text_endk(pseudo_text, end_token_ids,
                                                        text_pe=True,
                                                        stepk=12, normalize=True)
-            cls_features = cls_features.float()
 
-        cls_scores = self.cls_score(cls_features)
-        return cls_scores
+        return cls_features.float()
 
     def forward(self, x):
         x = self.pre_forward(x)

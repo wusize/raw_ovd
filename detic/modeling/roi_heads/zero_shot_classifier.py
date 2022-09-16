@@ -61,7 +61,7 @@ class ZeroShotClassifier(nn.Module):
             'norm_temperature': cfg.MODEL.ROI_BOX_HEAD.NORM_TEMP,
         }
 
-    def forward(self, x):
+    def forward(self, x, bg_class_embedding=None):
         '''
         Inputs:
             x: B x D'
@@ -70,8 +70,9 @@ class ZeroShotClassifier(nn.Module):
         if self.cfg.MODEL.ROI_BOX_HEAD.LEARN_BG:
             assert not self.cfg.MODEL.ROI_BOX_HEAD.BG_BIAS
             assert not self.cfg.MODEL.ROI_BOX_HEAD.USE_SIGMOID_CE
-            input_one = x[0].new_ones(1, 1)
-            bg_class_embedding = self.bg_embedding(input_one)
+            if bg_class_embedding is None:
+                input_one = x[0].new_ones(1, 1)
+                bg_class_embedding = self.bg_embedding(input_one)   # 1x512
             bg_class_embedding = F.normalize(bg_class_embedding, p=2, dim=1)[0]
             zs_weight = torch.cat([self.zs_weight[:, :-1], bg_class_embedding[:, None]], dim=-1)
         else:
