@@ -37,7 +37,7 @@ class EnsembleFastRCNNOutputLayers(DeticFastRCNNOutputLayers):
 
         num_inst_per_image = [len(p) for p in proposals]
         # scores_kd[..., -1] = self.cfg.MODEL.ROI_BOX_HEAD.MASK_VALUE  # mask the bg for kd score
-        scores_kd[..., is_base > 0.0] = self.cfg.MODEL.ROI_BOX_HEAD.MASK_VALUE
+        # scores_kd[..., is_base > 0.0] = self.cfg.MODEL.ROI_BOX_HEAD.MASK_VALUE
         if self.cfg.MODEL.ROI_BOX_HEAD.COSINE_SCORE:
             probs = scores.clamp(min=0.0) / self.cls_score.norm_temperature
             probs_kd = scores_kd.clamp(min=0.0) / self.cls_score.norm_temperature
@@ -48,8 +48,6 @@ class EnsembleFastRCNNOutputLayers(DeticFastRCNNOutputLayers):
             else:
                 probs = F.softmax(scores, dim=-1)
                 probs_kd = F.softmax(scores_kd, dim=-1)
-        obj_scores = torch.cat([p.objectness_logits.sigmoid() for p in proposals])
-        probs_kd = probs_kd * (obj_scores[:, None]) ** 4
         probs_base = (probs ** factor) * (probs_kd ** (1.0 - factor)) * is_base[None]
         probs_novel = (probs ** (1.0 - factor)) * (probs_kd ** factor) * (1.0 - is_base[None])
         probs = probs_base + probs_novel
