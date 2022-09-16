@@ -110,7 +110,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             cls_features = self.cls_score.zs_weight   # note that the last row and col is bg(0)
             similarity_matrix = cls_features.T @ cls_features
             self.register_buffer('similarity_matrix', similarity_matrix)
-        if self.MODEL.ROI_BOX_HEAD.WORD_BACKGROUND:
+        if self.cfg.MODEL.ROI_BOX_HEAD.WORD_BACKGROUND:
             assert self.cfg.MODEL.ROI_BOX_HEAD.LEARN_BG
             self.bg_embedding = nn.Linear(1, 2 * num_words * word_embed_dim)   # use more words than the foreground
             nn.init.xavier_uniform_(self.bg_embedding.weight)
@@ -379,7 +379,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             return pseudo_words.new_zeros(0, self.num_classes + 1)
         clip_model.eval()
         cls_features = self.forward_clip_text(pseudo_words, clip_model)
-        if self.MODEL.ROI_BOX_HEAD.WORD_BACKGROUND:
+        if self.cfg.MODEL.ROI_BOX_HEAD.WORD_BACKGROUND:
             ones = pseudo_words.new_ones(1, 1)
             bg_words = self.bg_embedding(ones).view(1, 2 * self.num_words,
                                                     self.word_embed_dim)
