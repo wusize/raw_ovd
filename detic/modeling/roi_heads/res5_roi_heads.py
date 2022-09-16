@@ -6,7 +6,6 @@ from detectron2.config import configurable
 from detectron2.layers import ShapeSpec
 from detectron2.modeling.roi_heads.roi_heads import ROI_HEADS_REGISTRY, Res5ROIHeads
 from .detic_fast_rcnn import DeticFastRCNNOutputLayers
-from torch.nn import functional as F
 from detectron2.utils.events import get_event_storage
 from detectron2.modeling.proposal_generator.proposal_utils \
     import add_ground_truth_to_proposals
@@ -86,12 +85,6 @@ class CustomRes5ROIHeads(Res5ROIHeads):
                                                              self.box_predictor.clip, image_info))
                 storage.put_scalar("time/contrast_learning", np.float32(time() - tok))
 
-            if self.cfg.MODEL.WITH_IMAGE_LABELS:
-                loss = self.image_label_loss(resized_image_info)
-                if loss is None:
-                    loss = list(losses.values())[0] * 0.0
-                losses.update(image_label_loss=loss)
-
             return proposals, losses
         else:
             predictions = self.box_predictor(
@@ -161,39 +154,3 @@ class CustomRes5ROIHeads(Res5ROIHeads):
                            proposal_deltas=proposal_deltas)
 
         return predictions
-
-    def image_label_loss(self, resized_image_info):
-        proposals = resized_image_info['proposals']
-        num_imgs = len(proposals)
-        if num_imgs == 0:
-            return None
-        proposals = [p[:self.cfg.MODEL.ROI_BOX_HEAD.WS_NUM_PROPS] for p in proposals]
-        image_labels = resized_image_info['image_labels']
-        max_size_proposals = []
-        for p in proposals:
-            assert len(p) > 0
-            areas = p.proposal_boxes.area()
-            idx = areas.argmax().item()
-            max_size_proposals.append(p[idx:idx+1])
-        features = resized_image_info['features']
-        proposal_boxes = [x.proposal_boxes for x in max_size_proposals]
-        box_features = self._shared_roi_transform(
-            [features[f] for f in self.in_features], proposal_boxes
-        )
-        box_features = self.box_predictor.pre_forward(
-            box_features.mean(dim=[2, 3]))
-        pseudo_words = self.box_predictor.pred_words(box_features)  # Nx1024 -> Nx4x512
-        scores = self.box_predictor.pred_cls_score(pseudo_words)[..., :-1]
-        targets = torch.zeros_like(scores)
-        loss_weights = torch.ones_like(scores)
-        for i in range(num_imgs):
-            targets[i, image_labels[i]] = 1.0
-            loss_weights[i, image_labels[i]] = self.cfg.MODEL.ROI_BOX_HEAD.IMAGE_POS_WEIGHT
-
-        loss = F.binary_cross_entropy_with_logits(scores, targets, reduction='none')
-        loss = (loss * loss_weights).sum() / (loss_weights.sum() + 1e-12)
-
-        if loss > 100.0:
-            loss = loss * 0.0
-
-        return loss * self.cfg.MODEL.ROI_BOX_HEAD.IMAGE_LOSS_WEIGHT

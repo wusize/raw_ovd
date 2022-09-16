@@ -15,6 +15,7 @@ from time import time
 from torch.cuda.amp import autocast
 from detic.modeling import clip as CLIP
 from detectron2.structures.masks import PolygonMasks
+from timm.loss import SoftTargetCrossEntropy
 
 
 def perm_generator(seq):
@@ -157,6 +158,7 @@ class ContextModelling(nn.Module):
             else:
                 self.positional_embed = ZeroPositionalEncoding(num_words=num_words,
                                                                word_dims=word_embed_dim)
+            self.caption_loss = SoftTargetCrossEntropy()
 
     # preprocess topk proposals
     def preprocess_proposals(self, proposals, shape_ratio_thr, area_ratio_thr, objectness_thr, nms_thr):
@@ -540,13 +542,12 @@ class ContextModelling(nn.Module):
         return caption_features, num_captions_per_image
 
     def caption_contrast(self, caption_normed_boxes, predictions, clip_model, image_info):
-        image_ids = [im['image_id'] for im in image_info]
         clip_model.eval()
         batch_size = len(caption_normed_boxes)
         caption_pseudo_words = predictions.pop('caption_pseudo_words')
         device = caption_pseudo_words.device
         all_clip_caption_features, num_captions_per_image = self.get_caption_features([v['captions']
-                                                                                       for v in image_info],
+                                                                                       for v in image_info.values()],
                                                                                       device,
                                                                                       clip_model)
 
@@ -588,7 +589,7 @@ class ContextModelling(nn.Module):
         if all_clip_caption_features is None:
             caption_valid = torch.zeros(batch_size, device=device)
             clip_caption_features = torch.zeros(batch_size, 512, device=device)
-            caption_img_ids = torch.tensor(image_ids, device=device,
+            caption_img_ids = torch.tensor(list(image_info.keys()), device=device,
                                            dtype=torch.float32)
         else:
             caption_valid = []
@@ -596,7 +597,7 @@ class ContextModelling(nn.Module):
             clip_caption_features_list = []
             caption_img_ids = []
             max_caps = self.caption_cfg.CAPS_PER_IMG
-            for img_id, num_cap, cap_feat in zip(image_ids,
+            for img_id, num_cap, cap_feat in zip(image_info.keys(),
                                                  num_captions_per_image, clip_caption_features):
                 assert num_cap == cap_feat.shape[0]
                 if num_cap > 0:
@@ -612,38 +613,65 @@ class ContextModelling(nn.Module):
             caption_valid = torch.cat(caption_valid)
             clip_caption_features = torch.cat(clip_caption_features_list)
             caption_img_ids = torch.cat(caption_img_ids)
+        invalid_caps = torch.where(caption_valid < 1.0)[0]
         pred_image_ids = torch.tensor([k for num_perms, k in zip(num_perms_per_image,
-                                                                 image_ids) for _ in range(num_perms)],
+                                                                 image_info.keys()) for _ in range(num_perms)],
                                       device=device)
         num_preds = clip_text_features.shape[0]
         assert sum(num_perms_per_image) == num_preds
         assert pred_image_ids.shape[0] == num_preds
 
-        # pred_text as queries
+        global_clip_text_features = self.queues.get_queue('clip_cap_text_features')  # add "_cap_" to avoid conflict
+        contrast_clip_text_features = torch.cat([clip_text_features,
+                                                 global_clip_text_features[..., :-1]], dim=0)
+        contrast_clip_text_image_ids = torch.cat([pred_image_ids,
+                                                  global_clip_text_features[..., -1]], dim=0)
+
         global_clip_caption_features = self.queues.get_queue('clip_caption_features')
-        keys_caption = torch.cat([clip_caption_features, global_clip_caption_features[..., :-1]])
-        similarity_matrix_0 = self.bce_temp * clip_text_features @ keys_caption.T + self.bce_bias
-        key_img_ids = torch.cat([caption_img_ids, global_clip_caption_features[..., -1]])
-        label_matrix = (pred_image_ids[:, None] == key_img_ids[None]).float()
+        contrast_clip_caption_features = torch.cat([clip_caption_features,
+                                                    global_clip_caption_features[..., :-1]], dim=0)
+        contrast_clip_caption_image_ids = torch.cat([caption_img_ids,
+                                                     global_clip_caption_features[..., -1]], dim=0)
 
-        loss_weights = torch.ones_like(similarity_matrix_0)
-        loss_weights[label_matrix > 0.0] = self.cfg.BCE_POS_WEIGHT    # pos weight
-        loss_weights[:, :clip_caption_features.shape[0]][:, caption_valid < 1.0] = 0.0
+        # matrix 0
+        label_matrix_0 = (contrast_clip_text_image_ids[:, None] == contrast_clip_caption_image_ids[None]).float()
 
-        loss = F.binary_cross_entropy_with_logits(similarity_matrix_0, label_matrix, reduction='none')
-        loss = (loss * loss_weights).sum() / (loss_weights.sum() + 1e-12)
+        # matrix 1
+        label_matrix_1 = label_matrix_0.T
+
+        similarity_matrix_0 = self.ce_temp * contrast_clip_text_features @ contrast_clip_caption_features.T
+        similarity_matrix_1 = self.ce_temp * contrast_clip_caption_features @ contrast_clip_text_features.T
+
+        # mask invalid captions
+        if len(invalid_caps) > 0:
+            # matrix 0
+            invalid_label_matrix_0 = label_matrix_0[:, invalid_caps]
+            invalid_mask_0 = torch.where(invalid_label_matrix_0 > 0.0, self.ce_temp, -self.ce_temp)
+            similarity_matrix_0[:, invalid_caps] = invalid_mask_0
+
+            # matrix 1
+            invalid_label_matrix_1 = label_matrix_1[invalid_caps]
+            invalid_mask_1 = torch.where(invalid_label_matrix_1 > 0.0, self.ce_temp, -self.ce_temp)
+            similarity_matrix_1[invalid_caps] = invalid_mask_1
+
+        loss_0 = self.caption_loss(similarity_matrix_0, label_matrix_0)
+        loss_1 = self.caption_loss(similarity_matrix_1, label_matrix_1)
+
+        loss = loss_0 * 0.5 + loss_1 * 0.5
 
         if all_clip_caption_features is None:
             clip_caption_features_update = -torch.ones(1, 512 + 1, device=device)
         else:
-            all_cap_image_ids = [img_id for img_id, num_cap in zip(image_ids, num_captions_per_image)
+            all_cap_image_ids = [img_id for img_id, num_cap in zip(image_info.keys(), num_captions_per_image)
                                  for _ in range(num_cap)]
             all_cap_image_ids = torch.tensor(all_cap_image_ids,
                                              device=device, dtype=torch.float32).view(-1, 1)
             clip_caption_features_update = torch.cat([all_clip_caption_features,
                                                       all_cap_image_ids], dim=-1)
 
-        queue_update = dict(clip_caption_features=clip_caption_features_update)
+        queue_update = dict(clip_caption_features=clip_caption_features_update,
+                            clip_cap_text_features=torch.cat([clip_text_features,
+                                                              pred_image_ids[:, None]], dim=-1))
 
         return dict(caption_loss=loss * self.cfg.CAPTION_LOSS_WEIGHT), queue_update
 
