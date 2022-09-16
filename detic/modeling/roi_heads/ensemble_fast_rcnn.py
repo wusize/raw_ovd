@@ -49,7 +49,7 @@ class EnsembleFastRCNNOutputLayers(DeticFastRCNNOutputLayers):
                 probs = F.softmax(scores, dim=-1)
                 probs_kd = F.softmax(scores_kd, dim=-1)
         obj_scores = torch.cat([p.objectness_logits.sigmoid() for p in proposals])
-        probs_kd = probs_kd * obj_scores[:, None]
+        probs_kd = probs_kd * (obj_scores[:, None]) ** 4
         probs_base = (probs ** factor) * (probs_kd ** (1.0 - factor)) * is_base[None]
         probs_novel = (probs ** (1.0 - factor)) * (probs_kd ** factor) * (1.0 - is_base[None])
         probs = probs_base + probs_novel
