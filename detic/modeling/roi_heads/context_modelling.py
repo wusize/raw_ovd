@@ -542,12 +542,13 @@ class ContextModelling(nn.Module):
         return caption_features, num_captions_per_image
 
     def caption_contrast(self, caption_normed_boxes, predictions, clip_model, image_info):
+        image_ids = [im['image_id'] for im in image_info]
         clip_model.eval()
         batch_size = len(caption_normed_boxes)
         caption_pseudo_words = predictions.pop('caption_pseudo_words')
         device = caption_pseudo_words.device
         all_clip_caption_features, num_captions_per_image = self.get_caption_features([v['captions']
-                                                                                       for v in image_info.values()],
+                                                                                       for v in image_info],
                                                                                       device,
                                                                                       clip_model)
 
@@ -589,7 +590,7 @@ class ContextModelling(nn.Module):
         if all_clip_caption_features is None:
             caption_valid = torch.zeros(batch_size, device=device)
             clip_caption_features = torch.zeros(batch_size, 512, device=device)
-            caption_img_ids = torch.tensor(list(image_info.keys()), device=device,
+            caption_img_ids = torch.tensor(image_ids, device=device,
                                            dtype=torch.float32)
         else:
             caption_valid = []
@@ -597,7 +598,7 @@ class ContextModelling(nn.Module):
             clip_caption_features_list = []
             caption_img_ids = []
             max_caps = self.caption_cfg.CAPS_PER_IMG
-            for img_id, num_cap, cap_feat in zip(image_info.keys(),
+            for img_id, num_cap, cap_feat in zip(image_ids,
                                                  num_captions_per_image, clip_caption_features):
                 assert num_cap == cap_feat.shape[0]
                 if num_cap > 0:
@@ -615,7 +616,7 @@ class ContextModelling(nn.Module):
             caption_img_ids = torch.cat(caption_img_ids)
         invalid_caps = torch.where(caption_valid < 1.0)[0]
         pred_image_ids = torch.tensor([k for num_perms, k in zip(num_perms_per_image,
-                                                                 image_info.keys()) for _ in range(num_perms)],
+                                                                 image_ids) for _ in range(num_perms)],
                                       device=device)
         num_preds = clip_text_features.shape[0]
         assert sum(num_perms_per_image) == num_preds
@@ -662,7 +663,7 @@ class ContextModelling(nn.Module):
         if all_clip_caption_features is None:
             clip_caption_features_update = -torch.ones(1, 512 + 1, device=device)
         else:
-            all_cap_image_ids = [img_id for img_id, num_cap in zip(image_info.keys(), num_captions_per_image)
+            all_cap_image_ids = [img_id for img_id, num_cap in zip(image_ids, num_captions_per_image)
                                  for _ in range(num_cap)]
             all_cap_image_ids = torch.tensor(all_cap_image_ids,
                                              device=device, dtype=torch.float32).view(-1, 1)
