@@ -72,10 +72,11 @@ def repeat_crops_and_get_att_mask(crops, repeat_nums, normed_boxes, num_heads, g
         attn_mask = torch.where(attn_mask > 0.0, 0.0, float('-inf'))
         attn_mask[:, range(grid_size ** 2 + 1), range(grid_size ** 2 + 1)] = 0.0
         attn_mask = attn_mask[:, None].repeat(1, num_heads, 1, 1)
+        attn_mask = attn_mask.flatten(0, 1)
     else:
         attn_mask = None
 
-    return repeated_crops, attn_mask.flatten(0, 1)
+    return repeated_crops, attn_mask
 
 
 def get_att_mask_by_matrix(normed_boxes, grid_size):
