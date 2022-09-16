@@ -213,3 +213,4 @@ def add_detic_config(cfg):
     _C.MODEL.ROI_BOX_HEAD.NOVEL_FACTOR = 1.0
 
     _C.MODEL.ROI_BOX_HEAD.WORD_BACKGROUND = False
+    _C.MODEL.ROI_BOX_HEAD.DROP_LAST = True

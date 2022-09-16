@@ -365,7 +365,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         is_empty = mask.sum(dim=-1) == 0.0
         mask[is_empty, 0] = 1.0       # TODO add random on this
         mask[mask > 0.0] = 1.0
-        if self.training:             # TODO discard this
+        if self.training and self.cfg.MODEL.ROI_BOX_HEAD.DROP_LAST:
             is_full = (mask > 0.0).sum(dim=-1) == num_words
             mask[is_full, -1] = 0.0
         # add start and end token mask
