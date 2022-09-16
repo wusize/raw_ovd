@@ -31,7 +31,6 @@ class EnsembleFastRCNNOutputLayers(DeticFastRCNNOutputLayers):
         # TODO: ensemble the cosine similarity scores
 
         factor = self.cfg.MODEL.ROI_BOX_HEAD.ENSEMBLE_FACTOR
-        assert factor < 0.5
         is_base = torch.cat([
             (self.is_base.view(-1) > 1e-4).float(),
             self.is_base.new_ones(1)])  # C + 1
