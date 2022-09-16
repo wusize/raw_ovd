@@ -37,7 +37,7 @@ class EnsembleFastRCNNOutputLayers(DeticFastRCNNOutputLayers):
 
         num_inst_per_image = [len(p) for p in proposals]
         # scores_kd[..., -1] = self.cfg.MODEL.ROI_BOX_HEAD.MASK_VALUE  # mask the bg for kd score
-        scores_kd[..., is_base] = self.cfg.MODEL.ROI_BOX_HEAD.MASK_VALUE
+        scores_kd[..., is_base > 0.0] = self.cfg.MODEL.ROI_BOX_HEAD.MASK_VALUE
         if self.cfg.MODEL.ROI_BOX_HEAD.COSINE_SCORE:
             probs = scores.clamp(min=0.0) / self.cls_score.norm_temperature
             probs_kd = scores_kd.clamp(min=0.0) / self.cls_score.norm_temperature
