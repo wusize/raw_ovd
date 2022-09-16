@@ -47,7 +47,7 @@ class EnsembleFastRCNNOutputLayers(DeticFastRCNNOutputLayers):
                 probs_kd = scores_kd.sigmoid()
             else:
                 probs = F.softmax(scores, dim=-1)
-                probs_kd = F.softmax(scores_kd, dim=-1)
+                probs_kd = F.softmax(scores_kd * self.cfg.MODEL.ROI_BOX_HEAD.RESCALE_TEMP, dim=-1)
         probs_base = (probs ** factor) * (probs_kd ** (1.0 - factor)) * is_base[None]
         probs_novel = (probs ** (1.0 - factor)) * (probs_kd ** factor) * (1.0 - is_base[None])
         probs = probs_base + probs_novel
