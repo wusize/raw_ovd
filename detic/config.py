@@ -214,3 +214,5 @@ def add_detic_config(cfg):
 
     _C.MODEL.ROI_BOX_HEAD.WORD_BACKGROUND = False
     _C.MODEL.ROI_BOX_HEAD.DROP_LAST = True
+
+    _C.CONTEXT_MODELLING.USE_ATTN_MASK = True

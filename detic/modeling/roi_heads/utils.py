@@ -55,23 +55,25 @@ def preprocess_proposals(proposals, shape_ratio_thr, area_ratio_thr, objectness_
 
 
 # repeat crops and get attention masks
-def repeat_crops_and_get_att_mask(crops, repeat_nums, normed_boxes, num_heads, grid_size=7):
+def repeat_crops_and_get_att_mask(crops, repeat_nums, normed_boxes, num_heads, grid_size=7, use_attn_mask=True):
     repeated_crops = torch.cat([crop[None].repeat(repeat_num, 1, 1, 1)
                                 for crop, repeat_num in zip(crops, repeat_nums)], dim=0)
-
-    boxes_split_by_seqs = [n.shape[0] for n in normed_boxes]
-    normed_boxes = torch.cat(normed_boxes)
-    masks_per_box = get_att_mask_by_matrix(normed_boxes, grid_size)
-    masks_split_by_seqs = masks_per_box.split(boxes_split_by_seqs, dim=0)
-    masks_split_by_seqs = [ms.sum(0) for ms in masks_split_by_seqs]
-    masks_split_by_seqs = torch.stack(masks_split_by_seqs, dim=0)
-    mask_flatten = masks_split_by_seqs.flatten(-2, -1)
-    mask_flatten = torch.cat([torch.ones_like(mask_flatten[..., :1]),
-                              mask_flatten], dim=-1)
-    attn_mask = mask_flatten[..., None] * mask_flatten[:, None, :]
-    attn_mask = torch.where(attn_mask > 0.0, 0.0, float('-inf'))
-    attn_mask[:, range(grid_size ** 2 + 1), range(grid_size ** 2 + 1)] = 0.0
-    attn_mask = attn_mask[:, None].repeat(1, num_heads, 1, 1)
+    if use_attn_mask:
+        boxes_split_by_seqs = [n.shape[0] for n in normed_boxes]
+        normed_boxes = torch.cat(normed_boxes)
+        masks_per_box = get_att_mask_by_matrix(normed_boxes, grid_size)
+        masks_split_by_seqs = masks_per_box.split(boxes_split_by_seqs, dim=0)
+        masks_split_by_seqs = [ms.sum(0) for ms in masks_split_by_seqs]
+        masks_split_by_seqs = torch.stack(masks_split_by_seqs, dim=0)
+        mask_flatten = masks_split_by_seqs.flatten(-2, -1)
+        mask_flatten = torch.cat([torch.ones_like(mask_flatten[..., :1]),
+                                  mask_flatten], dim=-1)
+        attn_mask = mask_flatten[..., None] * mask_flatten[:, None, :]
+        attn_mask = torch.where(attn_mask > 0.0, 0.0, float('-inf'))
+        attn_mask[:, range(grid_size ** 2 + 1), range(grid_size ** 2 + 1)] = 0.0
+        attn_mask = attn_mask[:, None].repeat(1, num_heads, 1, 1)
+    else:
+        attn_mask = None
 
     return repeated_crops, attn_mask.flatten(0, 1)
 

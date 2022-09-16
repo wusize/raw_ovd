@@ -345,11 +345,15 @@ class ContextModelling(nn.Module):
                                                  input_to_clip, seqs_split_by_group,
                                                  normed_boxes_split_by_perms,
                                                  num_heads=clip_model.visual.num_heads,
-                                                 grid_size=clip_input_size // 32)
+                                                 grid_size=clip_input_size // 32,
+                                                 use_attn_mask=self.cfg.USE_ATTN_MASK)
         storage.put_scalar("contrast_learning_time/generate_attn_mask",
                            np.float32(time() - tik))
         repeated_crops = torch.cat(repeated_crops, dim=0)
-        attn_masks = torch.cat(attn_masks, dim=0)
+        if attn_masks[0] is None:
+            attn_masks = None
+        else:
+            attn_masks = torch.cat(attn_masks, dim=0)
         clip_img_features, clip_img_tokens = clip_model.encode_image(
             repeated_crops, normalize=True, return_image_tokens=True, attn_masks=attn_masks)
 
