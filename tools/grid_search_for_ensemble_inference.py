@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 
 parser = ArgumentParser(description='COCO Error Analysis Tool')
 parser.add_argument('--partition', type=str)
-parser.add_argument('--quota_type', type=str)
+parser.add_argument('--quota_type', type=str, default="")
 parser.add_argument('--config_file', type=str)
 parser.add_argument('--model_path', type=str)
 parser.add_argument('--out_dir', type=str)
