@@ -19,7 +19,7 @@ def add_detic_config(cfg):
     _C.MODEL.ROI_BOX_HEAD.PRIOR_PROB = 0.01
     _C.MODEL.ROI_BOX_HEAD.USE_FED_LOSS = False # Federated Loss
     _C.MODEL.ROI_BOX_HEAD.CAT_FREQ_PATH = \
-        'datasets/metadata/lvis_v1_train_cat_info.json'
+        'datasets/metadata/lvis_v1_train_cat_norare_info.json'
     _C.MODEL.ROI_BOX_HEAD.FED_LOSS_NUM_CAT = 50
     _C.MODEL.ROI_BOX_HEAD.FED_LOSS_FREQ_WEIGHT = 0.5
 

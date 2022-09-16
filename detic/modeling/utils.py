@@ -8,10 +8,10 @@ from six.moves import map, zip
 
 
 def load_class_freq(
-    path='datasets/metadata/lvis_v1_train_cat_info.json', freq_weight=1.0):
+    path='datasets/metadata/lvis_v1_train_cat_info.json', freq_weight=1.0, min_count=1):
     cat_info = json.load(open(path, 'r'))
     cat_info = torch.tensor(
-        [c['image_count'] for c in sorted(cat_info, key=lambda x: x['id'])])
+        [max(c['image_count'], min_count) for c in sorted(cat_info, key=lambda x: x['id'])])
     freq_weight = cat_info.float() ** freq_weight
     return freq_weight
 

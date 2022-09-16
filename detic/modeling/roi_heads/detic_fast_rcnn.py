@@ -59,11 +59,15 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             bias_value = -math.log((1 - prior_prob) / prior_prob)
             nn.init.constant_(self.cls_score.bias, bias_value)
         
-        # if self.use_fed_loss or self.ignore_zero_cats:
-        freq_weight = load_class_freq(cat_freq_path, fed_loss_freq_weight)
-        self.register_buffer('freq_weight', freq_weight)
-        # else:
-        #     self.freq_weight = None
+        if self.use_fed_loss:
+            freq_weight = load_class_freq(cat_freq_path, fed_loss_freq_weight, min_count=1)   # for fed_loss
+            self.register_buffer('freq_weight', freq_weight)   # only for def loss
+        else:
+            self.freq_weight = None
+
+        is_base = load_class_freq(cat_freq_path, 1.0, min_count=0)  # to mask the novel classes
+        assert (is_base > 0.0).sum() < self.num_classes
+        self.register_buffer('is_base', is_base)
 
         if self.use_fed_loss and len(self.freq_weight) < self.num_classes:
             # assert self.num_classes == 11493
@@ -197,8 +201,8 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             appeared_mask = appeared_mask[:C]
             fed_w = appeared_mask.view(1, C).expand(B, C)
             weight = weight * fed_w.float()
-        if self.ignore_zero_cats and (self.freq_weight is not None):
-            w = (self.freq_weight.view(-1) > 1e-4).float()
+        if self.ignore_zero_cats and (self.is_base is not None):
+            w = (self.is_base.view(-1) > 1e-4).float()
             weight = weight * w.view(1, C).expand(B, C)
             # import pdb; pdb.set_trace()
 
@@ -214,10 +218,10 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         if pred_class_logits.numel() == 0:
             return pred_class_logits.new_zeros([1])[0]
 
-        if self.ignore_zero_cats and (self.freq_weight is not None):
+        if self.ignore_zero_cats and (self.is_base is not None):
             zero_weight = torch.cat([
-                (self.freq_weight.view(-1) > 1e-4).float(),
-                self.freq_weight.new_ones(1)])  # C + 1
+                (self.is_base.view(-1) > 1e-4).float(),
+                self.is_base.new_ones(1)])  # C + 1
             # TODO: use direct mask on the pred_class_logits
             pred_class_logits[..., zero_weight < 1.0] = self.cfg.MODEL.ROI_BOX_HEAD.MASK_VALUE
             if self.cfg.MODEL.ROI_BOX_HEAD.MASK_FOR_POS:
@@ -328,8 +332,8 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             novel_factor = self.cfg.MODEL.ROI_BOX_HEAD.NOVEL_FACTOR
 
             novel_classes = torch.cat([
-                (self.freq_weight.view(-1) > 1e-4).float(),
-                self.freq_weight.new_ones(1)]) < 0.5
+                (self.is_base.view(-1) > 1e-4).float(),
+                self.is_base.new_ones(1)]) < 0.5
             probs[:, novel_classes] = probs[:, novel_classes] ** novel_factor
 
         return probs.split(num_inst_per_image, dim=0)

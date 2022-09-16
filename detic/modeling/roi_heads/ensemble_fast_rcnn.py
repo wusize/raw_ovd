@@ -33,8 +33,8 @@ class EnsembleFastRCNNOutputLayers(DeticFastRCNNOutputLayers):
         factor = self.cfg.MODEL.ROI_BOX_HEAD.ENSEMBLE_FACTOR
         assert factor < 0.5
         is_base = torch.cat([
-            (self.freq_weight.view(-1) > 1e-4).float(),
-            self.freq_weight.new_ones(1)])  # C + 1
+            (self.is_base.view(-1) > 1e-4).float(),
+            self.is_base.new_ones(1)])  # C + 1
 
         num_inst_per_image = [len(p) for p in proposals]
         scores_kd[..., -1] = self.cfg.MODEL.ROI_BOX_HEAD.MASK_VALUE  # mask the bg for kd score
