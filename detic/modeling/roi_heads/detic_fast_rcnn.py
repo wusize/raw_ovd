@@ -223,19 +223,19 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         if pred_class_logits.numel() == 0:
             return pred_class_logits.new_zeros([1])[0]
 
-        if self.ignore_zero_cats and (self.is_base is not None):
+        if self.ignore_zero_cats:
             zero_weight = torch.cat([
                 (self.is_base.view(-1) > 1e-4).float(),
                 self.is_base.new_ones(1)])  # C + 1
             # TODO: use direct mask on the pred_class_logits
-            pred_class_logits[..., zero_weight < 1.0] = self.cfg.MODEL.ROI_BOX_HEAD.MASK_VALUE
             if self.cfg.MODEL.ROI_BOX_HEAD.MASK_FOR_POS:
                 pos_preds = gt_classes < self.num_classes
                 if pos_preds.sum() > 0:
-                    simi = self.similarity_matrix[gt_classes[pos_preds]]
-                    assert simi.shape == pred_class_logits[pos_preds].shape
                     pred_class_logits[pos_preds][:, zero_weight < 1.0] = \
-                        simi[:, zero_weight < 1.0] * self.cls_score.norm_temperature
+                        self.cfg.MODEL.ROI_BOX_HEAD.MASK_VALUE
+            else:
+                pred_class_logits[..., zero_weight < 1.0] = self.cfg.MODEL.ROI_BOX_HEAD.MASK_VALUE
+
             loss = F.cross_entropy(
                 pred_class_logits, gt_classes, reduction="mean")
         elif self.use_fed_loss and (self.freq_weight is not None):  # fedloss
