@@ -228,11 +228,11 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
                 (self.is_base.view(-1) > 1e-4).float(),
                 self.is_base.new_ones(1)])  # C + 1
             # TODO: use direct mask on the pred_class_logits
-            if self.cfg.MODEL.ROI_BOX_HEAD.MASK_FOR_POS:
-                pos_preds = gt_classes < self.num_classes
-                if pos_preds.sum() > 0:
-                    pred_class_logits[pos_preds][:, zero_weight < 1.0] = \
-                        self.cfg.MODEL.ROI_BOX_HEAD.MASK_VALUE
+            if self.cfg.MODEL.ROI_BOX_HEAD.MASK_FOR_NEG:
+                neg_preds = gt_classes == self.num_classes   # bg
+                assert neg_preds.sum() > 0
+                pred_class_logits[neg_preds][:, zero_weight < 1.0] = \
+                    self.cfg.MODEL.ROI_BOX_HEAD.MASK_VALUE
             else:
                 pred_class_logits[..., zero_weight < 1.0] = self.cfg.MODEL.ROI_BOX_HEAD.MASK_VALUE
 
