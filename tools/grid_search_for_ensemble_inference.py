@@ -40,7 +40,8 @@ threads = []
 
 for temp in RESCALE_TEMPS:
     for factor in ENSEMBLE_FACTORS:
-        t = threading.Thread(target=th, name='th', args={temp, factor})
+        t = threading.Thread(target=th, name='th', kwargs=dict(rescale_temp=temp,
+                                                               ensemble_factor=factor))
         threads.append(t)
         t.start()
 
