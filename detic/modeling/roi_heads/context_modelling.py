@@ -238,6 +238,7 @@ class ContextModelling(nn.Module):
     def _caption_sampling(self, topk_proposals, mask_on=False):
         if not self.caption_cfg.ENABLE:
             return topk_proposals[:0], None
+        topk_proposals = topk_proposals[:self.caption_cfg.TOPK]
         if len(topk_proposals) == 0:
             h, w = topk_proposals.image_size
             device = topk_proposals.gt_classes.device
