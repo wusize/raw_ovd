@@ -219,3 +219,6 @@ def add_detic_config(cfg):
     _C.CONTEXT_MODELLING.USE_ATTN_MASK = True
 
     _C.TEST.SAVE_RESULTS = False
+    _C.MODEL.ROI_BOX_HEAD.MASK_FOR_NEG = False
+
+    _C.CONTEXT_MODELLING.CAPTION.TOPK = 128
