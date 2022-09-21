@@ -48,9 +48,14 @@ class EnsembleFastRCNNOutputLayers(DeticFastRCNNOutputLayers):
             else:
                 probs = F.softmax(scores, dim=-1)
                 probs_kd = F.softmax(scores_kd * self.cfg.MODEL.ROI_BOX_HEAD.RESCALE_TEMP, dim=-1)
-        probs_base = (probs ** factor) * (probs_kd ** (1.0 - factor)) * is_base[None]
-        probs_novel = (probs ** (1.0 - factor)) * (probs_kd ** factor) * (1.0 - is_base[None])
-        probs = probs_base + probs_novel
+
+        if self.cfg.MODEL.ROI_BOX_HEAD.TRANSFER > 0.0:
+            transfer_factor = self.cfg.MODEL.ROI_BOX_HEAD.TRANSFER
+            probs = (probs ** transfer_factor) * (probs_kd ** (1.0 - transfer_factor))
+        else:
+            probs_base = (probs ** factor) * (probs_kd ** (1.0 - factor)) * is_base[None]
+            probs_novel = (probs ** (1.0 - factor)) * (probs_kd ** factor) * (1.0 - is_base[None])
+            probs = probs_base + probs_novel
         return probs.split(num_inst_per_image, dim=0)
 
     def pred_words_kd(self, x):
