@@ -50,6 +50,7 @@ class EnsembleFastRCNNOutputLayers(DeticFastRCNNOutputLayers):
             transfer_factor = self.cfg.MODEL.ROI_BOX_HEAD.TRANSFER
             probs = (probs ** transfer_factor) * (probs_kd ** (1.0 - transfer_factor))
         else:
+            assert (self.is_base > 0.0).sum() < self.num_classes
             is_base = torch.cat([
                 (self.is_base.view(-1) > 1e-4).float(),
                 self.is_base.new_ones(1)])  # C + 1
