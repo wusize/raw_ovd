@@ -23,6 +23,7 @@ from detectron2.evaluation import (
     print_csv_format,
     LVISEvaluator,
     COCOEvaluator,
+    PascalVOCDetectionEvaluator
 )
 from detectron2.modeling import build_model
 from detectron2.solver import build_lr_scheduler, build_optimizer
@@ -82,6 +83,8 @@ def do_test(cfg, model):
                 evaluator = COCOEvaluator(dataset_name, cfg, True, output_folder)
         elif evaluator_type == 'oid':
             evaluator = OIDEvaluator(dataset_name, cfg, True, output_folder)
+        elif evaluator_type == "pascal_voc":
+            evaluator = PascalVOCDetectionEvaluator(dataset_name)
         else:
             assert 0, evaluator_type
             
