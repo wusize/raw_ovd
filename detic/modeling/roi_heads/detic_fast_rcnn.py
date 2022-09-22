@@ -66,7 +66,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             self.freq_weight = None
 
         is_base = load_class_freq(cat_freq_path, 1.0, min_count=0)  # to mask the novel classes
-        assert (is_base > 0.0).sum() < self.num_classes
+        # assert (is_base > 0.0).sum() < self.num_classes
         self.register_buffer('is_base', is_base)
 
         if self.use_fed_loss and len(self.freq_weight) < self.num_classes:

@@ -31,9 +31,6 @@ class EnsembleFastRCNNOutputLayers(DeticFastRCNNOutputLayers):
         # TODO: ensemble the cosine similarity scores
 
         factor = self.cfg.MODEL.ROI_BOX_HEAD.ENSEMBLE_FACTOR
-        is_base = torch.cat([
-            (self.is_base.view(-1) > 1e-4).float(),
-            self.is_base.new_ones(1)])  # C + 1
 
         num_inst_per_image = [len(p) for p in proposals]
         # scores_kd[..., -1] = self.cfg.MODEL.ROI_BOX_HEAD.MASK_VALUE  # mask the bg for kd score
@@ -53,6 +50,9 @@ class EnsembleFastRCNNOutputLayers(DeticFastRCNNOutputLayers):
             transfer_factor = self.cfg.MODEL.ROI_BOX_HEAD.TRANSFER
             probs = (probs ** transfer_factor) * (probs_kd ** (1.0 - transfer_factor))
         else:
+            is_base = torch.cat([
+                (self.is_base.view(-1) > 1e-4).float(),
+                self.is_base.new_ones(1)])  # C + 1
             probs_base = (probs ** factor) * (probs_kd ** (1.0 - factor)) * is_base[None]
             probs_novel = (probs ** (1.0 - factor)) * (probs_kd ** factor) * (1.0 - is_base[None])
             probs = probs_base + probs_novel
