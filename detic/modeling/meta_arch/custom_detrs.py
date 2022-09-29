@@ -157,7 +157,7 @@ class CustomDeformableDETR(DeformableDETR):
         # topk = self.transformer.two_stage_num_proposals
         outputs_classes = []
         outputs_coords = []
-        assert hs.shape[0] > self.num_words
+        assert hs.shape[0] >= self.num_words
         for lvl in range(hs.shape[0]):
             if lvl == 0:
                 reference = init_reference
