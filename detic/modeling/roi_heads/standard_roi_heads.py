@@ -11,7 +11,7 @@ from detectron2.utils.events import get_event_storage
 from detectron2.modeling.proposal_generator.proposal_utils \
     import add_ground_truth_to_proposals
 from detectron2.structures import pairwise_iou
-from detic.modeling.roi_heads.context_modelling import ContextModelling
+from detic.modeling import context
 from time import time
 from detectron2.modeling.roi_heads.roi_heads import select_foreground_proposals
 
@@ -30,7 +30,7 @@ class CustomStandardROIHeads(StandardROIHeads):
 
         self.context_modeling_cfg = cfg.CONTEXT_MODELLING
         self.cfg = cfg
-
+        ContextModelling = getattr(context, self.context_modeling_cfg.VERSION)
         self.context_modeling = ContextModelling(self.context_modeling_cfg,
                                                  num_words=self.box_predictor.num_words,
                                                  word_embed_dim=self.box_predictor.word_embed_dim,
@@ -98,7 +98,7 @@ class CustomStandardROIHeads(StandardROIHeads):
         del images
         if self.training:
             proposals, group_infos = self.label_and_sample_proposals(
-                proposals, targets, ann_types=ann_types)
+                proposals, targets, ann_types=ann_types, image_ids=[im['image_id'] for im in image_info])
             del targets
             losses = self._forward_box(features, proposals, clip_images, image_info,
                                        resized_image_info, group_infos)
@@ -116,7 +116,7 @@ class CustomStandardROIHeads(StandardROIHeads):
             return pred_instances, {}
 
     @torch.no_grad()
-    def label_and_sample_proposals(self, proposals, targets, ann_types):
+    def label_and_sample_proposals(self, proposals, targets, ann_types, image_ids):
         if self.proposal_append_gt:
             proposals = add_ground_truth_to_proposals(targets, proposals)
 
@@ -125,7 +125,8 @@ class CustomStandardROIHeads(StandardROIHeads):
         num_fg_samples = []
         num_bg_samples = []
         group_infos = []
-        for proposals_per_image, targets_per_image, ann_type in zip(proposals, targets, ann_types):
+        for proposals_per_image, targets_per_image, ann_type, image_id \
+                in zip(proposals, targets, ann_types, image_ids):
             has_gt = len(targets_per_image) > 0
             match_quality_matrix = pairwise_iou(
                 targets_per_image.gt_boxes, proposals_per_image.proposal_boxes
@@ -134,7 +135,8 @@ class CustomStandardROIHeads(StandardROIHeads):
             sampled_idxs, gt_classes = self._sample_proposals(
                 matched_idxs, matched_labels, targets_per_image.gt_classes
             )
-            added_instances, group_info = self.context_modeling.sample(proposals_per_image, self.mask_on)
+            added_instances, group_info = self.context_modeling.sample(proposals_per_image, self.mask_on,
+                                                                       image_id=image_id)
             group_infos.append(group_info)
             # sample type: -1 for topk; 0 for det; 1 for clip-img; 2 for caption
 

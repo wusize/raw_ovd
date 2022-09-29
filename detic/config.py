@@ -225,3 +225,5 @@ def add_detic_config(cfg):
     _C.CONTEXT_MODELLING.CAPTION.TOPK = 128
 
     _C.MODEL.DETR.NO_SELF_ATTN = False
+    _C.CONTEXT_MODELLING.ANN_PATH = "datasets/coco/zero-shot/instances_train2017_seen_2_oriorder_with_cap.json"
+    _C.CONTEXT_MODELLING.VERSION = ""
