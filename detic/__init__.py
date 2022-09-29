@@ -19,7 +19,5 @@ from .data.datasets import oid
 from .data.datasets import coco_zeroshot
 from .data.datasets import coco_custom
 
-try:
-    from .modeling.meta_arch import d2_deformable_detr
-except:
-    pass
+from .modeling.meta_arch.d2_deformable_detr import DeformableDetr
+from .modeling.meta_arch.custom_detrs import CustomDeformableDetr

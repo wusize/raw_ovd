@@ -21,6 +21,7 @@ from util.misc import NestedTensor, accuracy
 
 __all__ = ["DeformableDetr"]
 
+
 class CustomSetCriterion(SetCriterion):
     def __init__(self, num_classes, matcher, weight_dict, losses, \
         focal_alpha=0.25, use_fed_loss=False):
@@ -96,17 +97,15 @@ class MaskedBackbone(nn.Module):
             out[name] = NestedTensor(x, mask)
         return out
 
+
 @META_ARCH_REGISTRY.register()
 class DeformableDetr(nn.Module):
     """
     Implement Deformable Detr
     """
-
+    # FIXME: support mask on
     def __init__(self, cfg):
         super().__init__()
-        self.with_image_labels = cfg.WITH_IMAGE_LABELS
-        self.weak_weight = cfg.MODEL.DETR.WEAK_WEIGHT
-
         self.device = torch.device(cfg.MODEL.DEVICE)
         self.test_topk = cfg.TEST.DETECTIONS_PER_IMAGE
         self.num_classes = cfg.MODEL.DETR.NUM_CLASSES
@@ -185,7 +184,6 @@ class DeformableDetr(nn.Module):
         pixel_std = torch.Tensor(cfg.MODEL.PIXEL_STD).to(self.device).view(3, 1, 1)
         self.normalizer = lambda x: (x - pixel_mean) / pixel_std
 
-
     def forward(self, batched_inputs):
         """
         Args:
@@ -203,21 +201,12 @@ class DeformableDetr(nn.Module):
             for k in loss_dict.keys():
                 if k in weight_dict:
                     loss_dict[k] *= weight_dict[k]
-            if self.with_image_labels:
-                if batched_inputs[0]['ann_type'] in ['image', 'captiontag']:
-                    loss_dict['loss_image'] = self.weak_weight * self._weak_loss(
-                        output, batched_inputs)
-                else:
-                    loss_dict['loss_image'] = images[0].new_zeros(
-                        [1], dtype=torch.float32)[0]
-                # import pdb; pdb.set_trace()
             return loss_dict
         else:
             image_sizes = output["pred_boxes"].new_tensor(
                 [(t["height"], t["width"]) for t in batched_inputs])
             results = self.post_process(output, image_sizes)
             return results
-
 
     def prepare_targets(self, targets):
         new_targets = []
@@ -234,7 +223,6 @@ class DeformableDetr(nn.Module):
                 gt_masks = convert_coco_poly_to_mask(gt_masks.polygons, h, w)
                 new_targets[-1].update({'masks': gt_masks})
         return new_targets
-
 
     def post_process(self, outputs, target_sizes):
         """
@@ -266,43 +254,9 @@ class DeformableDetr(nn.Module):
             results.append({'instances': r})
         return results
 
-
     def preprocess_image(self, batched_inputs):
         """
         Normalize, pad and batch the input images.
         """
         images = [self.normalizer(x["image"].to(self.device)) for x in batched_inputs]
         return images
-
-
-    def _weak_loss(self, outputs, batched_inputs):
-        loss = 0
-        for b, x in enumerate(batched_inputs):
-            labels = x['pos_category_ids']
-            pred_logits = [outputs['pred_logits'][b]]
-            pred_boxes = [outputs['pred_boxes'][b]]
-            for xx in outputs['aux_outputs']:
-                pred_logits.append(xx['pred_logits'][b])
-                pred_boxes.append(xx['pred_boxes'][b])
-            pred_logits = torch.stack(pred_logits, dim=0) # L x N x C
-            pred_boxes = torch.stack(pred_boxes, dim=0) # L x N x 4
-            for label in labels:
-                loss += self._max_size_loss(
-                    pred_logits, pred_boxes, label) / len(labels)
-        loss = loss / len(batched_inputs)
-        return loss
-
-
-    def _max_size_loss(self, logits, boxes, label):
-        '''
-        Inputs:
-          logits: L x N x C
-          boxes: L x N x 4
-        '''
-        target = logits.new_zeros((logits.shape[0], logits.shape[2]))
-        target[:, label] = 1.
-        sizes = boxes[..., 2] * boxes[..., 3] # L x N
-        ind = sizes.argmax(dim=1) # L
-        loss = F.binary_cross_entropy_with_logits(
-            logits[range(len(ind)), ind], target, reduction='sum')
-        return loss

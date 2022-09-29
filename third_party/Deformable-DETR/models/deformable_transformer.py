@@ -292,10 +292,12 @@ class DeformableTransformerDecoderLayer(nn.Module):
         tgt = self.norm3(tgt)
         return tgt
 
-    def forward(self, tgt, query_pos, reference_points, src, src_spatial_shapes, level_start_index, src_padding_mask=None):
+    def forward(self, tgt, query_pos, reference_points, src, src_spatial_shapes, level_start_index,
+                src_padding_mask=None, self_attn_mask=None):
         # self attention
         q = k = self.with_pos_embed(tgt, query_pos)
-        tgt2 = self.self_attn(q.transpose(0, 1), k.transpose(0, 1), tgt.transpose(0, 1))[0].transpose(0, 1)
+        tgt2 = self.self_attn(q.transpose(0, 1), k.transpose(0, 1), tgt.transpose(0, 1),
+                              attn_mask=self_attn_mask)[0].transpose(0, 1)
         tgt = tgt + self.dropout2(tgt2)
         tgt = self.norm2(tgt)
 
@@ -323,7 +325,7 @@ class DeformableTransformerDecoder(nn.Module):
         self.class_embed = None
 
     def forward(self, tgt, reference_points, src, src_spatial_shapes, src_level_start_index, src_valid_ratios,
-                query_pos=None, src_padding_mask=None):
+                query_pos=None, src_padding_mask=None, self_attn_mask=None):
         output = tgt
 
         intermediate = []
@@ -335,7 +337,8 @@ class DeformableTransformerDecoder(nn.Module):
             else:
                 assert reference_points.shape[-1] == 2
                 reference_points_input = reference_points[:, :, None] * src_valid_ratios[:, None]
-            output = layer(output, query_pos, reference_points_input, src, src_spatial_shapes, src_level_start_index, src_padding_mask)
+            output = layer(output, query_pos, reference_points_input, src, src_spatial_shapes, src_level_start_index,
+                           src_padding_mask, self_attn_mask=self_attn_mask)
 
             # hack implementation for iterative bounding box refinement
             if self.bbox_embed is not None:

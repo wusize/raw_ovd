@@ -27,7 +27,7 @@ from torch import Tensor
 
 # needed due to empty tensor bug in pytorch and torchvision 0.5
 import torchvision
-if float(torchvision.__version__[:3]) < 0.5:
+if float(torchvision.__version__[2:4]) < 5:   # FIXME: bug for version >= 0.10
     import math
     from torchvision.ops.misc import _NewEmptyTensorOp
     def _check_size_scale_factor(dim, size, scale_factor):
@@ -54,7 +54,7 @@ if float(torchvision.__version__[:3]) < 0.5:
         return [
             int(math.floor(input.size(i + 2) * scale_factors[i])) for i in range(dim)
         ]
-elif float(torchvision.__version__[:3]) < 0.7:
+elif float(torchvision.__version__[2:4]) < 7:
     from torchvision.ops import _new_empty_tensor
     from torchvision.ops.misc import _output_size
 
@@ -509,6 +509,7 @@ def get_total_grad_norm(parameters, norm_type=2):
     total_norm = torch.norm(torch.stack([torch.norm(p.grad.detach(), norm_type).to(device) for p in parameters]),
                             norm_type)
     return total_norm
+
 
 def inverse_sigmoid(x, eps=1e-5):
     x = x.clamp(min=0, max=1)
