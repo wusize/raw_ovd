@@ -69,7 +69,7 @@ class BoxesCache(nn.Module):
         num_images = len(images_info)
         self.image_id2ordered_id = {info['id']: ordered_id for ordered_id, info in enumerate(images_info)}
         boxes = torch.zeros(num_images, num_proposals, 5)   # [x1, y1, x2, y2, s]
-        self.register_buffer("boxes", boxes)
+        self.register_buffer("boxes", boxes, persistent=False)
         self.num_proposals = num_proposals
 
     @torch.no_grad()
