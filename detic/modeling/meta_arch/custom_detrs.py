@@ -181,8 +181,9 @@ class CustomDeformableDETR(DeformableDETR):
         out = {'pred_logits': self.interpret_pseudo_words(outputs_class[..., -self.num_words:, :],
                                                           clip_model=clip_model),   # each stage predict a word
                'pred_boxes': outputs_coord[..., -1, :]}
-        if self.aux_loss:
-            out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
+        # if self.aux_loss:
+            # out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
+        assert not self.aux_loss
 
         enc_outputs_coord = enc_outputs_coord_unact.sigmoid()
         out['enc_outputs'] = {'pred_logits': enc_outputs_class, 'pred_boxes': enc_outputs_coord}
@@ -254,6 +255,8 @@ class CustomDeformableDETR(DeformableDETR):
             boxes_valid_list.append(boxes_valid)
 
             attn_mask = boxes_valid[None] * boxes_valid[:, None]
+            if self.cfg.MODEL.DETR.NO_SELF_ATTN:
+                attn_mask = attn_mask * 0.0
             attn_mask = torch.where(attn_mask > 0.0, 0.0, float('-inf'))
             attn_mask.fill_diagonal_(0.0)
             attn_mask = attn_mask[None].repeat(self.transformer.nhead, 1, 1)
