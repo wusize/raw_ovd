@@ -201,7 +201,7 @@ class CustomDeformableDETR(DeformableDETR):
         added_instances, group_infos = multi_apply(context_sampler.sample,
                                                    [Instances(image_size=(1, 1),  # normalized
                                                               objectness_logits=torch.cat([
-                                                                  inverse_sigmoid(torch.zeros_like(gt[:, 0])),
+                                                                  inverse_sigmoid(torch.ones_like(gt[:, 0])),
                                                                   topk_obj
                                                               ], dim=0),
                                                               proposal_boxes=Boxes(box_cxcywh_to_xyxy(  # xyxy format
