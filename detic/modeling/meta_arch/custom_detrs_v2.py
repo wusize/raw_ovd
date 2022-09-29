@@ -83,7 +83,7 @@ class CustomDeformableDETRV2(CustomDeformableDETR):
         # topk = self.transformer.two_stage_num_proposals
         outputs_classes = []
         outputs_coords = []
-        num_levels, batch_size, num_queries, _ = hs.shape[:2]
+        num_levels, batch_size, num_queries, _ = hs.shape
         for lvl in range(hs.shape[0]):
             if lvl == 0:
                 reference = init_reference
