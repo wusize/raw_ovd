@@ -30,7 +30,7 @@ class CustomStandardROIHeads(StandardROIHeads):
 
         self.context_modeling_cfg = cfg.CONTEXT_MODELLING
         self.cfg = cfg
-        ContextModelling = getattr(context, self.context_modeling_cfg.VERSION)
+        ContextModelling = getattr(context, f'{self.context_modeling_cfg.VERSION}ContextModelling')
         self.context_modeling = ContextModelling(self.context_modeling_cfg,
                                                  num_words=self.box_predictor.num_words,
                                                  word_embed_dim=self.box_predictor.word_embed_dim,
