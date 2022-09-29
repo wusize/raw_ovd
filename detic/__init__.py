@@ -21,3 +21,4 @@ from .data.datasets import coco_custom
 
 from .modeling.meta_arch.d2_deformable_detr import DeformableDetr
 from .modeling.meta_arch.custom_detrs import CustomDeformableDetr
+from .modeling.meta_arch.custom_detrs_v2 import CustomDeformableDetrV2
