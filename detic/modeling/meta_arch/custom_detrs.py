@@ -286,7 +286,7 @@ class CustomDeformableDETR(DeformableDETR):
                                                        text_pe=True,
                                                        stepk=12, normalize=True)
         cls_logits = self.classifier(cls_features.float())[..., :-1]
-        if self.cfg.MODEL.ROI_BOX_HEAD.IGNORE_ZERO_CATS:
+        if self.cfg.MODEL.ROI_BOX_HEAD.IGNORE_ZERO_CATS and self.training:
             zero_weight = (self.is_base.view(-1) > 1e-4).float()
             cls_logits[..., zero_weight < 1.0] = self.cfg.MODEL.ROI_BOX_HEAD.MASK_VALUE
 
