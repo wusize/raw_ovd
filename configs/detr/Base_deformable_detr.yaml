@@ -9,6 +9,7 @@ MODEL:
     STRIDE_IN_1X1: False
     OUT_FEATURES: ["res3", "res4", "res5"]
   DETR:
+    DEEP_SUPERVISION: False
     CLS_WEIGHT: 2.0
     GIOU_WEIGHT: 2.0
     L1_WEIGHT: 5.0
