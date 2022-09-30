@@ -13,19 +13,19 @@ class CacheContextModelling(ContextModelling):
         self.boxes_cache = BoxesCache(self.cfg.ANN_PATH, self.cfg.TOPK)
 
     # TODO: input topk proposals
-    def sample(self, proposals_per_image, mask_on=False, image_id=None, **kwargs):
+    def sample(self, proposals_per_image, mask_on=False, image_info=None, **kwargs):
         topk_proposals = self._sample_topk_proposals(proposals_per_image, mask_on)
-        return self.sample_on_topk(topk_proposals, mask_on, image_id)
+        return self.sample_on_topk(topk_proposals, mask_on, image_info)
 
-    def sample_on_topk(self, topk_proposals, mask_on=False, image_id=None):
-        checkborad_instances, checkborad_group_info = self._checkboard_sampling(topk_proposals, mask_on, image_id)
+    def sample_on_topk(self, topk_proposals, mask_on=False, image_info=None):
+        checkborad_instances, checkborad_group_info = self._checkboard_sampling(topk_proposals, mask_on, image_info)
         caption_instances, caption_normed_boxes = self._caption_sampling(topk_proposals, mask_on)
 
         return Instances.cat([checkborad_instances, caption_instances]), \
                dict(checkborad_group_info=checkborad_group_info,
                     caption_normed_boxes=caption_normed_boxes)
 
-    def _checkboard_sampling(self, topk_proposals, mask_on=False, image_id=None):
+    def _checkboard_sampling(self, topk_proposals, mask_on=False, image_info=None):
         if not self.checkboard_cfg.ENABLE:
             return topk_proposals[:0], None
         device = topk_proposals.proposal_boxes.device
@@ -48,8 +48,8 @@ class CacheContextModelling(ContextModelling):
                                                self.checkboard_cfg.NMS_THR)
         nmsed_proposals.sample_types[:] = 1    # clip_kd_samples: 1
 
-        if image_id is not None:
-            nmsed_proposals = self.boxes_cache.update(image_id, nmsed_proposals, self.checkboard_cfg.NMS_THR,
+        if image_info is not None:
+            nmsed_proposals = self.boxes_cache.update(image_info, nmsed_proposals, self.checkboard_cfg.NMS_THR,
                                                       self.cfg.OBJECTNESS_THR)
         # TODO: merge with cached samples by nms
         # name: "kd_proposals"

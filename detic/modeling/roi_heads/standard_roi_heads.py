@@ -98,7 +98,7 @@ class CustomStandardROIHeads(StandardROIHeads):
         del images
         if self.training:
             proposals, group_infos = self.label_and_sample_proposals(
-                proposals, targets, ann_types=ann_types, image_ids=[im['image_id'] for im in image_info])
+                proposals, targets, ann_types=ann_types, image_info=image_info)
             del targets
             losses = self._forward_box(features, proposals, clip_images, image_info,
                                        resized_image_info, group_infos)
@@ -116,7 +116,7 @@ class CustomStandardROIHeads(StandardROIHeads):
             return pred_instances, {}
 
     @torch.no_grad()
-    def label_and_sample_proposals(self, proposals, targets, ann_types, image_ids):
+    def label_and_sample_proposals(self, proposals, targets, ann_types, image_info):
         if self.proposal_append_gt:
             proposals = add_ground_truth_to_proposals(targets, proposals)
 
@@ -125,8 +125,8 @@ class CustomStandardROIHeads(StandardROIHeads):
         num_fg_samples = []
         num_bg_samples = []
         group_infos = []
-        for proposals_per_image, targets_per_image, ann_type, image_id \
-                in zip(proposals, targets, ann_types, image_ids):
+        for proposals_per_image, targets_per_image, ann_type, info_per_image \
+                in zip(proposals, targets, ann_types, image_info):
             has_gt = len(targets_per_image) > 0
             match_quality_matrix = pairwise_iou(
                 targets_per_image.gt_boxes, proposals_per_image.proposal_boxes
@@ -136,7 +136,7 @@ class CustomStandardROIHeads(StandardROIHeads):
                 matched_idxs, matched_labels, targets_per_image.gt_classes
             )
             added_instances, group_info = self.context_modeling.sample(proposals_per_image, self.mask_on,
-                                                                       image_id=image_id)
+                                                                       image_info=info_per_image)
             group_infos.append(group_info)
             # sample type: -1 for topk; 0 for det; 1 for clip-img; 2 for caption
 
