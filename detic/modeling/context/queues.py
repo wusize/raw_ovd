@@ -6,6 +6,7 @@ from torchvision.ops import nms
 import detectron2.utils.comm as comm
 from detectron2.structures import Boxes, Instances
 import json
+from detectron2.structures.boxes import pairwise_ioa
 
 
 class Queues(nn.Module):
@@ -73,17 +74,54 @@ class BoxesCache(nn.Module):
         self.num_proposals = num_proposals
 
     @torch.no_grad()
-    def update(self, image_id, proposals, nms_thr, score_thr):
+    def update(self, image_info, proposals, nms_thr, score_thr):
         # TODO: pull cached boxes from all devices
+        image_id = image_info['image_id']
         ordered_id = self.image_id2ordered_id[image_id]
         image_boxes_cache = self.boxes[ordered_id]
+        device = image_boxes_cache.device
+
+        # TODO: Transform to current size
+        transforms = image_info['transforms']
+        cur_h, cur_w = image_info['image_size']
+        cached_boxes = Boxes(torch.from_numpy(
+            transforms.apply_box(image_boxes_cache[:, :4].cpu())).to(device))
+        # check if in the transformed image
+        cur_image_box = torch.tensor([[0., 0., cur_w, cur_h]]).to(device)
+        iof = pairwise_ioa(cached_boxes, Boxes(cur_image_box))
+        cached_box_scores = iof.view(-1) * image_boxes_cache[:, 4]
+        cached_boxes.clip((cur_h, cur_w))   # clip out of bound areas
 
         proposal_boxes = proposals.proposal_boxes.tensor
         proposal_scores = proposals.objectness_logits.sigmoid()
 
+        merged_boxes = torch.cat([cached_boxes.tensor, proposal_boxes])
+        merged_scores = torch.cat([cached_box_scores, proposal_scores])
+
+        score_kept = merged_scores > score_thr
+        if score_kept.sum() == 0:
+            score_kept = [0]
+
+        merged_boxes = merged_boxes[score_kept]
+        merged_scores = merged_scores[score_kept]
+
+        nmsed_kept = nms(merged_boxes, merged_scores, nms_thr)
+
+        kept_boxes = merged_boxes[nmsed_kept]
+        kept_scores = merged_scores[nmsed_kept]
+
+        out = Instances(image_size=proposals.image_size,
+                        proposal_boxes=Boxes(kept_boxes),
+                        objectness_logits=inverse_sigmoid(kept_scores))
+
+        # TODO: transform to the original size
+        proposal_boxes = torch.from_numpy(
+            transforms.inverse().apply_box(
+                proposal_boxes.cpu())
+        ).to(device)
+
         merged_boxes = torch.cat([image_boxes_cache[:, :4], proposal_boxes])
         merged_scores = torch.cat([image_boxes_cache[:, 4], proposal_scores])
-
         score_kept = merged_scores > score_thr
         if score_kept.sum() == 0:
             score_kept = [0]
@@ -109,8 +147,4 @@ class BoxesCache(nn.Module):
             ordered_id_ = int(update_cache_[0, -1].item())
             self.boxes[ordered_id_] = update_cache_[:, :5].to(device)  # update
 
-        kept_logits = inverse_sigmoid(kept_scores)
-
-        return Instances(image_size=proposals.image_size,
-                         proposal_boxes=Boxes(kept_boxes),
-                         objectness_logits=kept_logits)
+        return out

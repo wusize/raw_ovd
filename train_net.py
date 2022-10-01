@@ -33,7 +33,6 @@ from detectron2.utils.events import (
     JSONWriter,
     TensorboardXWriter,
 )
-from detectron2.data.dataset_mapper import DatasetMapper
 from detectron2.data.build import build_detection_train_loader
 from detectron2.utils.logger import setup_logger
 from torch.cuda.amp import GradScaler
@@ -50,6 +49,7 @@ from detic.custom_solver import build_custom_optimizer
 from detic.evaluation.oideval import OIDEvaluator
 from detic.evaluation.custom_coco_eval import CustomCOCOEvaluator
 from detic.modeling.utils import reset_cls_test
+from detic.data.custom_dataset_mapper import WuSizeDatasetMapper as DatasetMapper
 
 
 logger = logging.getLogger("detectron2")

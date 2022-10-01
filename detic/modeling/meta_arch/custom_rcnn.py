@@ -139,7 +139,10 @@ class CustomRCNN(GeneralizedRCNN):
         ann_types = [b.get('ann_type', 'with_instance') for b in batched_inputs]
         image_info = [dict(captions=b.get('captions', []),
                            image_id=b['image_id'],
-                           pos_category_ids=b.get('pos_category_ids', [])) for b in batched_inputs]
+                           pos_category_ids=b.get('pos_category_ids', []),
+                           transforms=b['transforms'],
+                           image_size=b['image'].shape[1:],
+                           ori_image_size=(b['height'], b['width'])) for b in batched_inputs]
         gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
         storage = get_event_storage()
         tik = time()
