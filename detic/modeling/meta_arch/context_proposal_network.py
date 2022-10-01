@@ -33,7 +33,8 @@ class ContextProposalNetwork(ProposalNetwork):
             pixel_mean, pixel_std: list or tuple with #channels element, representing
                 the per-channel mean and std to be used to normalize the input image
         """
-        super().__init__()
+        super().__init__(backbone=backbone, proposal_generator=proposal_generator,
+                         pixel_mean=pixel_mean, pixel_std=pixel_std)
         self.backbone = backbone
         self.proposal_generator = proposal_generator
         self.register_buffer("pixel_mean", torch.tensor(pixel_mean).view(-1, 1, 1), False)
@@ -48,14 +49,8 @@ class ContextProposalNetwork(ProposalNetwork):
 
     @classmethod
     def from_config(cls, cfg):
-        backbone = build_backbone(cfg)
         cls.cfg = cfg
-        return {
-            "backbone": backbone,
-            "proposal_generator": build_proposal_generator(cfg, backbone.output_shape()),
-            "pixel_mean": cfg.MODEL.PIXEL_MEAN,
-            "pixel_std": cfg.MODEL.PIXEL_STD,
-        }
+        return super().from_config(cfg)
 
     def forward(self, batched_inputs):
         """
