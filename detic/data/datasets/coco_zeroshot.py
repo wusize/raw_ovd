@@ -103,6 +103,14 @@ _PREDEFINED_SPLITS_COCO = {
                                      "coco/zero-shot/instances_train2017_seen_2_oriorder_with_cap.json", 'all'),
 }
 
+WUSIZE_SPLIT_COCO = dict(wusize_val_base=("coco/val2017", "coco/wusize/instances_val2017_base.json", "all"),
+                         wusize_val_novel=("coco/val2017", "coco/wusize/instances_val2017_novel.json", "all"),
+                         wusize_train_base=("coco/train2017", "coco/wusize/instances_train2017_base.json", "all"),
+                         wusize_train_novel=("coco/train2017", "coco/wusize/instances_train2017_novel.json", "all")
+                         )
+
+_PREDEFINED_SPLITS_COCO.update(WUSIZE_SPLIT_COCO)
+
 for key, (image_root, json_file, cat) in _PREDEFINED_SPLITS_COCO.items():
     register_coco_instances(
         key,
