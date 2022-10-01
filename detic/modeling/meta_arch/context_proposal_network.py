@@ -43,9 +43,9 @@ class ContextProposalNetwork(ProposalNetwork):
         self.context_modeling_cfg = self.cfg.CONTEXT_MODELLING
         ContextModelling = getattr(context, f'{self.context_modeling_cfg.VERSION}ContextModelling')
         self.context_modeling = ContextModelling(self.context_modeling_cfg,
-                                                 num_words=self.box_predictor.num_words,
-                                                 word_embed_dim=self.box_predictor.word_embed_dim,
-                                                 word_dropout=self.box_predictor.word_dropout)
+                                                 num_words=4,
+                                                 word_embed_dim=512,
+                                                 word_dropout=0.5)
 
     @classmethod
     def from_config(cls, cfg):
