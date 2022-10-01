@@ -104,7 +104,7 @@ class ContextProposalNetwork(ProposalNetwork):
         sampled_proposals = []
 
         for proposals_per_image in proposals:
-            added_instances, _ = self.context_modeling.sample(proposals_per_image, self.mask_on)
+            added_instances, _ = self.context_modeling.sample(proposals_per_image)
             sampled_proposals.append(added_instances)
 
         return sampled_proposals
