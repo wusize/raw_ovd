@@ -1,10 +1,25 @@
 import json
 import argparse
-import sys
 
-sys.path.insert(0, 'third_party/CenterNet2/')
-sys.path.insert(0, 'third_party/Deformable-DETR')
-from detic.data.datasets.coco_zeroshot import categories_unseen
+categories_unseen = [
+    {'id': 5, 'name': 'airplane'},
+    {'id': 6, 'name': 'bus'},
+    {'id': 17, 'name': 'cat'},
+    {'id': 18, 'name': 'dog'},
+    {'id': 21, 'name': 'cow'},
+    {'id': 22, 'name': 'elephant'},
+    {'id': 28, 'name': 'umbrella'},
+    {'id': 32, 'name': 'tie'},
+    {'id': 36, 'name': 'snowboard'},
+    {'id': 41, 'name': 'skateboard'},
+    {'id': 47, 'name': 'cup'},
+    {'id': 49, 'name': 'knife'},
+    {'id': 61, 'name': 'cake'},
+    {'id': 63, 'name': 'couch'},
+    {'id': 76, 'name': 'keyboard'},
+    {'id': 81, 'name': 'sink'},
+    {'id': 87, 'name': 'scissors'},
+]
 
 novel_cat_ids = [cat['id'] for cat in categories_unseen]
 
