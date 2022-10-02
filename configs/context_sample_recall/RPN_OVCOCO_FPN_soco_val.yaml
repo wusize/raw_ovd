@@ -49,7 +49,7 @@ CONTEXT_MODELLING:
 
 DATASETS:
   TRAIN: ("coco_zeroshot_train_oriorder",)
-  TEST: ("wusize_train_novel", "wusize_train_base")
+  TEST: ("wusize_val_novel", "wusize_val_base")
 INPUT:
   FORMAT: "RGB"
   MIN_SIZE_TRAIN: (640, 672, 704, 736, 768, 800)
