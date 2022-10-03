@@ -63,7 +63,7 @@ def inverse_sigmoid(x, eps=1e-5):
 
 # TODO: a queue that save proposals for all images
 class BoxesCache(nn.Module):
-    def __init__(self, json_path, num_proposals):
+    def __init__(self, json_path, num_proposals, nms_thr=0.1):
         super(BoxesCache, self).__init__()
         with open(json_path, 'r') as f:
             images_info = json.load(f)['images']
@@ -72,9 +72,11 @@ class BoxesCache(nn.Module):
         boxes = torch.zeros(num_images, num_proposals, 5)   # [x1, y1, x2, y2, s]
         self.register_buffer("boxes", boxes, persistent=False)
         self.num_proposals = num_proposals
+        self.nms_thr = nms_thr
 
     @torch.no_grad()
-    def update(self, image_info, proposals, nms_thr, score_thr):
+    def update(self, image_info, proposals, score_thr):
+        nms_thr = self.nms_thr
         # TODO: pull cached boxes from all devices
         image_id = image_info['image_id']
         ordered_id = self.image_id2ordered_id[image_id]
