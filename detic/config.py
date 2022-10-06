@@ -228,3 +228,5 @@ def add_detic_config(cfg):
     _C.CONTEXT_MODELLING.ANN_PATH = "datasets/coco/zero-shot/instances_train2017_seen_2_oriorder_with_cap.json"
     _C.CONTEXT_MODELLING.VERSION = ""
     _C.CONTEXT_MODELLING.CACHE_NMS_THR = 0.1
+    _C.CONTEXT_MODELLING.SAVE_CACHE = False
+    _C.CONTEXT_MODELLING.SAMPLE_ONLY = False

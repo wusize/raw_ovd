@@ -61,7 +61,7 @@ class CustomStandardROIHeads(StandardROIHeads):
             storage.put_scalar("time/detector_forward", np.float32(tok - tik))
 
             # TODO contrastive learning
-            if self.context_modeling_cfg.ENABLE:
+            if self.context_modeling_cfg.ENABLE and not self.context_modeling_cfg.SAMPLE_ONLY:
                 losses.update(self.context_modeling.get_loss(group_infos,
                                                              predictions, clip_images,
                                                              self.box_predictor.clip, image_info))

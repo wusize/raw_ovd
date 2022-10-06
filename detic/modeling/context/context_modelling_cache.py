@@ -10,7 +10,8 @@ from .queues import BoxesCache
 class CacheContextModelling(ContextModelling):
     def __init__(self, *args, **kwargs):
         super(CacheContextModelling, self).__init__(*args, **kwargs)
-        self.boxes_cache = BoxesCache(self.cfg.ANN_PATH, self.cfg.TOPK, nms_thr=self.cfg.CACHE_NMS_THR)
+        self.boxes_cache = BoxesCache(self.cfg.ANN_PATH, self.cfg.TOPK, nms_thr=self.cfg.CACHE_NMS_THR,
+                                      save=self.cfg.SAVE_CACHE)
 
     # TODO: input topk proposals
     def sample(self, proposals_per_image, mask_on=False, image_info=None, **kwargs):
