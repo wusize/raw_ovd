@@ -108,7 +108,7 @@ class CacheV2ContextModelling(CacheContextModelling):
         if image_info is not None:
             storage = get_event_storage()
             iter = storage.iter
-            print(f'Device: {comm.get_rank()}, iter: {iter}', flush=True)
+            # print(f'Device: {comm.get_rank()}, iter: {iter}', flush=True)
             if iter > self.cfg.START_CACHE:
                 nmsed_proposals = self.boxes_cache.update(image_info, nmsed_proposals,
                                                           self.cfg.OBJECTNESS_THR)
