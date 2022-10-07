@@ -1,10 +1,12 @@
 import torch
 from .utils import multi_apply
 from detectron2.structures import Instances, Boxes
+from detectron2.utils.events import get_event_storage
 import numpy as np
 from detectron2.structures.masks import PolygonMasks
 from .context_modelling import ContextModelling
 from .queues import BoxesCache
+import detectron2.utils.comm as comm
 
 
 class CacheContextModelling(ContextModelling):
@@ -52,6 +54,64 @@ class CacheContextModelling(ContextModelling):
         if image_info is not None:
             nmsed_proposals = self.boxes_cache.update(image_info, nmsed_proposals,
                                                       self.cfg.OBJECTNESS_THR)
+        # TODO: merge with cached samples by nms
+        # name: "kd_proposals"
+
+        func = self.checkboard_sampling.sample
+        boxes = nmsed_proposals.proposal_boxes.tensor.tolist()
+        groups_per_proposal, normed_boxes, spanned_boxes, box_ids = \
+            multi_apply(func, boxes,
+                        [nmsed_proposals.image_size] * len(nmsed_proposals))
+        new_boxes = torch.cat([c for p in groups_per_proposal
+                               for g in p for c in g], dim=0).to(device)
+        num_added = len(new_boxes)
+        added_instances = Instances(image_size=nmsed_proposals.image_size,
+                                    proposal_boxes=Boxes(new_boxes),
+                                    objectness_logits=-torch.ones(num_added, device=device),
+                                    gt_classes=-torch.ones(num_added, device=device,
+                                                           dtype=torch.int64),
+                                    gt_boxes=Boxes(torch.zeros(num_added, 4, device=device)),
+                                    sample_types=torch.ones(num_added, device=device).int())   # clip_kd: 1
+        if mask_on:
+            added_instances.set('gt_masks',
+                                PolygonMasks([[np.asarray([0.0, 0.0, 0.0, 1.0, 1.0, 0.0])]] * num_added))
+
+        return added_instances, dict(normed_boxes=normed_boxes,
+                                     spanned_boxes=spanned_boxes,
+                                     box_ids=box_ids)
+
+
+class CacheV2ContextModelling(CacheContextModelling):
+    def _checkboard_sampling(self, topk_proposals, mask_on=False, image_info=None):
+        if not self.checkboard_cfg.ENABLE:
+            return topk_proposals[:0], None
+        device = topk_proposals.proposal_boxes.device
+        if len(topk_proposals) == 0:
+            h, w = topk_proposals.image_size
+            image_box = torch.tensor([0.0, 0.0, w - 1.0, h - 1.0], device=device)
+            topk_proposals = Instances(image_size=topk_proposals.image_size,
+                                       proposal_boxes=Boxes(image_box.view(-1, 4)),
+                                       objectness_logits=-torch.ones(1, device=device),
+                                       gt_classes=-torch.ones(1, device=device, dtype=torch.int64),
+                                       gt_boxes=Boxes(torch.zeros(1, 4, device=device)),
+                                       sample_types=-torch.ones(1, device=device).int())
+            if mask_on:
+                topk_proposals.set('gt_masks',
+                                   PolygonMasks([[np.asarray([0.0, 0.0, 0.0, 1.0, 1.0, 0.0]), ], ]))
+        nmsed_proposals = self.preprocess_proposals(topk_proposals,
+                                               self.cfg.SHAPE_RATIO_THR,
+                                               self.checkboard_cfg.AREA_RATIO_THR,
+                                               self.cfg.OBJECTNESS_THR,
+                                               self.checkboard_cfg.NMS_THR)
+        nmsed_proposals.sample_types[:] = 1    # clip_kd_samples: 1
+
+        if image_info is not None:
+            storage = get_event_storage()
+            iter = storage.iter
+            print(f'Device: {comm.get_rank()}, iter: {iter}', flush=True)
+            if iter > self.cfg.START_CACHE:
+                nmsed_proposals = self.boxes_cache.update(image_info, nmsed_proposals,
+                                                          self.cfg.OBJECTNESS_THR)
         # TODO: merge with cached samples by nms
         # name: "kd_proposals"
 
