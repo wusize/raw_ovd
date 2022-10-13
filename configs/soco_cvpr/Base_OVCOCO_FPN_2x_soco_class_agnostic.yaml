@@ -32,11 +32,13 @@ MODEL:
     IN_FEATURES: ["p2", "p3", "p4", "p5"]
   ROI_BOX_HEAD:
     NAME: "FastRCNNConvFCHead"
+    CLS_AGNOSTIC_BBOX_REG: True
     NUM_CONV: 4
     NUM_FC: 1
     NORM: "SyncBN"
     POOLER_RESOLUTION: 7
   ROI_MASK_HEAD:
+    CLS_AGNOSTIC_MASK: True
     NORM: "SyncBN"
     NAME: "MaskRCNNConvUpsampleHead"
     NUM_CONV: 4
