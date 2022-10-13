@@ -106,7 +106,13 @@ _PREDEFINED_SPLITS_COCO = {
 WUSIZE_SPLIT_COCO = dict(wusize_val_base=("coco/val2017", "coco/wusize/instances_val2017_base.json", "all"),
                          wusize_val_novel=("coco/val2017", "coco/wusize/instances_val2017_novel.json", "all"),
                          wusize_train_base=("coco/train2017", "coco/wusize/instances_train2017_base.json", "all"),
-                         wusize_train_novel=("coco/train2017", "coco/wusize/instances_train2017_novel.json", "all")
+                         wusize_train_novel=("coco/train2017", "coco/wusize/instances_train2017_novel.json", "all"),
+                         wusize_train_class_agnostic_base=("coco/train2017",
+                                                           "coco/wusize/instances_train2017_class_agnostic_base.json",
+                                                           "all"),
+                         wusize_val_class_agnostic_base=("coco/val2017",
+                                                         "coco/wusize/instances_val2017_class_agnostic_base.json",
+                                                         "all"),
                          )
 
 _PREDEFINED_SPLITS_COCO.update(WUSIZE_SPLIT_COCO)
