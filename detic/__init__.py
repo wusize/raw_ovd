@@ -23,3 +23,4 @@ from .modeling.meta_arch.d2_deformable_detr import DeformableDetr
 from .modeling.meta_arch.custom_detrs import CustomDeformableDetr
 from .modeling.meta_arch.custom_detrs_v2 import CustomDeformableDetrV2
 from .modeling.meta_arch.context_proposal_network import ContextProposalNetwork
+from .modeling.meta_arch.class_agnostic_clip_rcnn import CLassAgnosticCLIPRCNN
