@@ -46,8 +46,8 @@ TEST:
   PRECISE_BN:
     ENABLED: True
 DATASETS:
-  TRAIN: ("coco_2017_train",)
-  TEST: ("coco_2017_val",)
+  TRAIN: ("wusize_train_class_agnostic_base",)
+  TEST: ("wusize_val_class_agnostic_base",)
 SOLVER:
   WEIGHT_DECAY: 0.000025
   IMS_PER_BATCH: 16
