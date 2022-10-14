@@ -94,7 +94,7 @@ class CLassAgnosticCLIPRCNN(GeneralizedRCNN):
     @torch.no_grad()
     def _bbox_clip_image(self, instances, clip_images):
         # TODO: repeat and mask
-        clip_input_size = self.clip.visual.input_resolution
+        clip_input_size = self.cfg.MODEL.CLIP.INPUT_RESOLUTION
         num_proposals_per_image = [len(inst) for inst in instances]
         input_to_clip = roi_align(
             clip_images.tensor, self._expand_boxes(instances, 1.0),
