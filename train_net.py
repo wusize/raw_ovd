@@ -22,7 +22,7 @@ from detectron2.evaluation import (
     inference_on_dataset,
     print_csv_format,
     LVISEvaluator,
-    COCOEvaluator,
+    # COCOEvaluator,
     PascalVOCDetectionEvaluator
 )
 from detectron2.modeling import build_model
@@ -48,6 +48,7 @@ from detic.data.custom_dataset_mapper import CustomDatasetMapper, DetrDatasetMap
 from detic.custom_solver import build_custom_optimizer
 from detic.evaluation.oideval import OIDEvaluator
 from detic.evaluation.custom_coco_eval import CustomCOCOEvaluator
+from detic.evaluation.custom_coco_eval import WusizeCOCOEvaluator as COCOEvaluator
 from detic.modeling.utils import reset_cls_test
 from detic.data.custom_dataset_mapper import WuSizeDatasetMapper as DatasetMapper
 
