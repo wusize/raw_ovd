@@ -48,8 +48,12 @@ class VILDRCNN(GeneralizedRCNN):
         assert self.proposal_generator is not None
         proposals, proposal_losses = self.proposal_generator(images, features, gt_instances)
         assert "proposals" in batched_inputs[0]
-        import pdb; pdb.set_trace()
-        clip_proposals = [x["proposals"].to(self.device) for x in batched_inputs]
+        clip_proposals = []
+        for x in batched_inputs:
+            clip_proposals_per_image = x["proposals"].to(self.device)
+            clip_image_features = torch.from_numpy(x["clip_image_features"]).to(self.device)
+            clip_proposals_per_image.set("clip_image_features", clip_image_features)
+            clip_proposals.append(clip_proposals_per_image)
 
         _, detector_losses = self.roi_heads(images, features, proposals, gt_instances,
                                             clip_proposals=clip_proposals)
