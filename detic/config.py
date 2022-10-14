@@ -232,3 +232,5 @@ def add_detic_config(cfg):
     _C.CONTEXT_MODELLING.SAMPLE_ONLY = False
     _C.CONTEXT_MODELLING.START_CACHE = 10000
 
+    _C.VILD = CN()
+    _C.VILD.PROPOSAL_SCORE_THR = 0.5

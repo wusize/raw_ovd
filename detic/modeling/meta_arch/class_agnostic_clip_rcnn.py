@@ -64,6 +64,9 @@ class CLassAgnosticCLIPRCNN(GeneralizedRCNN):
         assert detected_instances is None
         proposals, _ = self.proposal_generator(images, features, None)
         results, _ = self.roi_heads(images, features, proposals, None)
+
+        results = self._filter_results(results)
+
         results = self._bbox_clip_image(results, clip_images)
 
         if do_postprocess:
@@ -128,3 +131,14 @@ class CLassAgnosticCLIPRCNN(GeneralizedRCNN):
             x1y1s = (box_centers + box_whs * 0.5 * scalar).clamp(max=torch.tensor([w, h]).to(boxes))
             boxes_list.append(torch.cat([x0y0s, x1y1s], dim=-1))
         return boxes_list
+
+    def _filter_results(self, instances):
+        new_instances = []
+        for inst in instances:
+            scores = inst.scores
+            valid = scores > self.cfg.VILD.PROPOSAL_SCORE_THR
+            if valid.sum() == 0:
+                valid = [scores.argmax().item()]
+            new_instances.append(inst[valid])
+
+        return new_instances
