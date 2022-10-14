@@ -38,6 +38,10 @@ MODEL:
     NUM_FC: 1
     NORM: "SyncBN"
     POOLER_RESOLUTION: 7
+  CLIP:
+    NAME: 'ViT-B/32'
+    USE_IMAGE_ENCODER: True
+    MODEL_ROOT: 'models'
 #  ROI_MASK_HEAD:
 #    CLS_AGNOSTIC_MASK: True
 #    NORM: "SyncBN"
