@@ -43,7 +43,7 @@ class VILDROIHeads(StandardROIHeads):
             kd_box_features = self.box_head(kd_box_features)
             pred_embeddings = self.box_predictor(kd_box_features, False)['pseudo_words']
             clip_embeddings = torch.cat([p.clip_image_features for p in clip_proposals], dim=0)
-            vild_loss = (pred_embeddings - clip_embeddings).norm(dim=-1, p=1)
+            vild_loss = (pred_embeddings - clip_embeddings).norm(dim=-1, p=1).mean()
 
             losses.update(vild_loss=self.cfg.VILD.LOSS_WEIGHT * vild_loss)
 
