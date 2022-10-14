@@ -126,5 +126,5 @@ class CLassAgnosticCLIPRCNN(GeneralizedRCNN):
             box_centers = (boxes[:, 2:] + boxes[:, :2]) * 0.5
             x0y0s = (box_centers - box_whs * 0.5 * scalar).clamp(min=0.0)
             x1y1s = (box_centers + box_whs * 0.5 * scalar).clamp(max=torch.tensor([w, h]).to(boxes))
-            boxes_list.append(torch.stack([x0y0s, x1y1s], dim=-1))
+            boxes_list.append(torch.cat([x0y0s, x1y1s], dim=-1))
         return boxes_list
