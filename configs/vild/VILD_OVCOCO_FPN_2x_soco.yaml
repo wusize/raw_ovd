@@ -3,7 +3,7 @@ MODEL:
   WEIGHTS: "models/res50_fpn_soco_star_400.pkl"
   PIXEL_MEAN: [ 123.675, 116.280, 103.530 ]
   PIXEL_STD: [ 58.395, 57.120, 57.375 ]
-  MASK_ON: True
+  MASK_ON: False
   META_ARCHITECTURE: "VILDRCNN"
   BACKBONE:
     FREEZE_AT: 0
@@ -38,12 +38,12 @@ MODEL:
     NUM_FC: 1
     NORM: "SyncBN"
     POOLER_RESOLUTION: 7
-  ROI_MASK_HEAD:
-    CLS_AGNOSTIC_MASK: True
-    NORM: "SyncBN"
-    NAME: "MaskRCNNConvUpsampleHead"
-    NUM_CONV: 4
-    POOLER_RESOLUTION: 14
+#  ROI_MASK_HEAD:
+#    CLS_AGNOSTIC_MASK: True
+#    NORM: "SyncBN"
+#    NAME: "MaskRCNNConvUpsampleHead"
+#    NUM_CONV: 4
+#    POOLER_RESOLUTION: 14
 TEST:
   EVAL_PERIOD: 10000
   PRECISE_BN:
@@ -63,5 +63,5 @@ INPUT:
   FORMAT: "RGB"
   MIN_SIZE_TRAIN: (640, 672, 704, 736, 768, 800)
 VERSION: 2
-OUTPUT_DIR: "./output/Detic-COCO/auto"
+OUTPUT_DIR: "./output/Detic-VILD/auto"
 FP16: True
