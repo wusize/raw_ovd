@@ -121,7 +121,7 @@ class CLassAgnosticCLIPRCNN(GeneralizedRCNN):
         boxes_list = []
         for inst in instances:
             h, w = inst.image_size
-            boxes = inst.proposal_boxes.tensor
+            boxes = inst.pred_boxes.tensor
             box_whs = boxes[:, 2:] - boxes[:, :2]
             box_centers = (boxes[:, 2:] + boxes[:, :2]) * 0.5
             x0y0s = (box_centers - box_whs * 0.5 * scalar).clamp(min=0.0)
