@@ -70,7 +70,7 @@ def instances_to_coco_json(instances, img_id):
     classes = instances.pred_classes.tolist()
     has_clip_image_features = instances.has('clip_image_features')
     if has_clip_image_features:
-        clip_image_features = instances.clip_image_features.tolist()
+        clip_image_features = instances.clip_image_features.half().tolist()
 
     has_mask = instances.has("pred_masks")
     if has_mask:
