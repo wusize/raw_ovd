@@ -32,6 +32,16 @@ MODEL:
     NAME: "VILDROIHeads"
     IN_FEATURES: ["p2", "p3", "p4", "p5"]
   ROI_BOX_HEAD:
+    NORM_TEMP: 50.0
+    USE_BIAS: 0.0
+    USE_SIGMOID_CE: False     # ce
+    USE_ZEROSHOT_CLS: True
+    ZEROSHOT_WEIGHT_PATH: 'datasets/metadata/coco_clip_hand_craft.npy'
+    IGNORE_ZERO_CATS: True
+    CAT_FREQ_PATH: 'datasets/coco/zero-shot/instances_train2017_seen_2_oriorder_cat_info.json'
+    NUM_WORDS: 4
+    WORD_EMBED_DIM: 512
+    CLS_LOSS_WEIGHT: 1.0
     NAME: "FastRCNNConvFCHead"
     CLS_AGNOSTIC_BBOX_REG: True
     NUM_CONV: 4
@@ -49,7 +59,7 @@ TEST:
   PRECISE_BN:
     ENABLED: True
 DATASETS:
-  PROPOSAL_FILES_TRAIN: ""   # to be input in command line
+  PROPOSAL_FILES_TRAIN: ("datasets/coco/proposals_with_clip.pkl",)   # to be input in command line
   TRAIN: ("wusize_train_base",)
   TEST: ("coco_generalized_zeroshot_val",)
 SOLVER:
