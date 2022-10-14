@@ -29,6 +29,7 @@ MODEL:
     POST_NMS_TOPK_TEST: 1000
   ROI_HEADS:
     NAME: "StandardROIHeads"
+    SCORE_THRESH_TEST: 0.0
     NUM_CLASSES: 1       # class agnostic
     IN_FEATURES: ["p2", "p3", "p4", "p5"]
   ROI_BOX_HEAD:
