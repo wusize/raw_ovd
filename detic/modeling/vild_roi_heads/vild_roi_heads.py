@@ -4,8 +4,7 @@ import torch
 from detectron2.config import configurable
 from detectron2.modeling.roi_heads.roi_heads import ROI_HEADS_REGISTRY, StandardROIHeads
 from .vild_fast_rcnn import VILDFastRCNNOutputLayers
-from detectron2.utils.events import get_event_storage
-from time import time
+import torch.nn.functional as F
 
 
 @ROI_HEADS_REGISTRY.register()
@@ -42,8 +41,10 @@ class VILDROIHeads(StandardROIHeads):
             kd_box_features = self.box_pooler(features, [x.proposal_boxes for x in clip_proposals])
             kd_box_features = self.box_head(kd_box_features)
             pred_embeddings = self.box_predictor(kd_box_features, False)['pseudo_words']
+            pred_embeddings = F.normalize(pred_embeddings, p=2, dim=-1)
             clip_embeddings = torch.cat([p.clip_image_features for p in clip_proposals], dim=0)
-            vild_loss = (pred_embeddings - clip_embeddings).norm(dim=-1, p=1).mean()
+            # vild_loss = (pred_embeddings - clip_embeddings).norm(dim=-1, p=1).mean()
+            vild_loss = 1.0 - (pred_embeddings * clip_embeddings).sum(-1).mean()
 
             losses.update(vild_loss=self.cfg.VILD.LOSS_WEIGHT * vild_loss)
 
@@ -86,21 +87,3 @@ class VILDROIHeads(StandardROIHeads):
             # applied to the top scoring box detections.
             pred_instances = self.forward_with_given_boxes(features, pred_instances)
             return pred_instances, {}
-
-    def _box_forward_train(self, box_features, proposals):
-        input_box_features = self.box_predictor.pre_forward(box_features)
-        del box_features
-        pseudo_words = self.box_predictor.pred_words(input_box_features)
-        sample_types = torch.cat([p.sample_types for p in proposals], dim=0)
-        storage = get_event_storage()
-        tik = time()
-        scores = self.box_predictor.pred_cls_score(pseudo_words[sample_types == 0])
-        storage.put_scalar('time/pred_cls', time() - tik)
-        proposal_deltas = self.box_predictor.bbox_pred(input_box_features[sample_types == 0])
-        del input_box_features
-        predictions = dict(kd_pseudo_words=pseudo_words[sample_types == 1],
-                           caption_pseudo_words=pseudo_words[sample_types == 2],
-                           scores=scores,
-                           proposal_deltas=proposal_deltas)
-
-        return predictions
