@@ -275,7 +275,6 @@ class VILDFastRCNNOutputLayers(FastRCNNOutputLayers):
         return predict_boxes.split(num_prop_per_image)
 
     def predict_probs(self, predictions, proposals):
-        super(VILDFastRCNNOutputLayers, self).predict_probs()
         """
         support sigmoid
         """
