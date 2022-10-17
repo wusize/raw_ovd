@@ -234,3 +234,4 @@ def add_detic_config(cfg):
 
     _C.VILD = CN()
     _C.VILD.PROPOSAL_SCORE_THR = 0.5
+    _C.VILD.LOSS_WEIGHT = 0.5

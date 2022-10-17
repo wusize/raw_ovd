@@ -24,3 +24,7 @@ from .modeling.meta_arch.custom_detrs import CustomDeformableDetr
 from .modeling.meta_arch.custom_detrs_v2 import CustomDeformableDetrV2
 from .modeling.meta_arch.context_proposal_network import ContextProposalNetwork
 from .modeling.meta_arch.class_agnostic_clip_rcnn import CLassAgnosticCLIPRCNN
+
+
+from .modeling.vild_roi_heads.vild_roi_heads import VILDROIHeads
+from .modeling.meta_arch.vild_rcnn import VILDRCNN
