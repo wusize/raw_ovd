@@ -8,7 +8,7 @@ from detectron2.modeling.roi_heads.roi_heads import ROI_HEADS_REGISTRY, Standard
 from .ensemble_fast_rcnn import EnsembleFastRCNNOutputLayers
 from detectron2.utils.events import get_event_storage
 from time import time
-from detic.modeling.roi_heads.context_modelling import ContextModelling
+from detic.modeling import context
 from detectron2.modeling.proposal_generator.proposal_utils \
     import add_ground_truth_to_proposals
 from detectron2.structures import pairwise_iou
@@ -29,6 +29,7 @@ class EnsembleStandardROIHeads(StandardROIHeads):
         self.context_modeling_cfg = cfg.CONTEXT_MODELLING
         assert self.context_modeling_cfg.ENABLE
         self.cfg = cfg
+        ContextModelling = getattr(context, f'{self.context_modeling_cfg.VERSION}ContextModelling')
         self.context_modeling = ContextModelling(self.context_modeling_cfg,
                                                  num_words=self.box_predictor.num_words,
                                                  word_embed_dim=self.box_predictor.word_embed_dim,
