@@ -1,0 +1,4 @@
+_BASE_: "./6words_0.7dropout_base_p0.5_3groups.yaml"
+MODEL:
+  ROI_BOX_HEAD:
+    RANDOM_DROPOUT: 0.0
