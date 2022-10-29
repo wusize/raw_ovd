@@ -1,3 +1,4 @@
 from .context_modelling import ContextModelling
 from .context_modelling_for_detr import DETRContextModelling
 from .context_modelling_cache import CacheContextModelling, CacheV2ContextModelling
+from .context_modelling_vild import ViLDContextModelling
