@@ -46,8 +46,9 @@ class ViLDContextModelling(CacheV2ContextModelling):
         normed_boxes_split_by_perms = [normed_boxes_.split(preds_split_by_perms_, dim=0)
                                        for normed_boxes_, preds_split_by_perms_
                                        in zip(normed_boxes, preds_split_by_perms)]
-        tok = time()
+        preds_split_by_perms = [p for b in preds_split_by_perms for p in b]
 
+        tok = time()
         with autocast():
             # TODO: get local image tokens
             valid_mask = self._drop_word(pseudo_words.half())
