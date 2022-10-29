@@ -87,7 +87,13 @@ class ContextProposalNetwork(ProposalNetwork):
         # This makes RPN-only models about 5% slower.
 
         # TODO context sampling on the proposals
-        proposals = self.sample_proposals(proposals)
+        image_infos = [dict(captions=b.get('captions', []),
+                            image_id=b['image_id'],
+                            pos_category_ids=b.get('pos_category_ids', []),
+                            transforms=b['transforms'],
+                            image_size=b['image'].shape[1:],
+                            ori_image_size=(b['height'], b['width'])) for b in batched_inputs]
+        proposals = self.sample_proposals(proposals, image_infos)
 
         processed_results = []
         for results_per_image, input_per_image, image_size in zip(
@@ -100,11 +106,12 @@ class ContextProposalNetwork(ProposalNetwork):
         return processed_results
 
     @torch.no_grad()
-    def sample_proposals(self, proposals):
+    def sample_proposals(self, proposals, image_infos):
         sampled_proposals = []
 
-        for proposals_per_image in proposals:
-            added_instances, _ = self.context_modeling.sample(proposals_per_image)
+        for proposals_per_image, image_info in zip(proposals, image_infos):
+            added_instances, _ = self.context_modeling.sample(proposals_per_image,
+                                                              image_info=image_info)
             sampled_proposals.append(added_instances)
 
         return sampled_proposals
