@@ -117,7 +117,8 @@ class BoxesCache(nn.Module):
         out = Instances(image_size=proposals.image_size,
                         proposal_boxes=Boxes(kept_boxes),
                         objectness_logits=inverse_sigmoid(kept_scores))
-
+        if not self.training:
+            return out
         # TODO: transform to the original size
         proposal_boxes = torch.from_numpy(
             transforms.inverse().apply_box(
