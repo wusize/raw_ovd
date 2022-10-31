@@ -79,6 +79,8 @@ class BoxesCache(nn.Module):
         nms_thr = self.nms_thr
         # TODO: pull cached boxes from all devices
         image_id = image_info['image_id']
+        if image_id not in self.image_id2ordered_id:
+            return proposals
         ordered_id = self.image_id2ordered_id[image_id]
         image_boxes_cache = self.boxes[ordered_id]
         device = image_boxes_cache.device
