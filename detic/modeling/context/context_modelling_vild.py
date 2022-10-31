@@ -57,10 +57,10 @@ class ViLDContextModelling(CacheV2ContextModelling):
             clip_word_features = \
                 clip_model.encode_pseudo_text(pseudo_text, end_token_ids,
                                               text_pe=True, normalize=True).float()
-            _, clip_image_tokens = self._bbox_clip_image(spanned_boxes, clip_images,
-                                                         seqs_split_by_group,
-                                                         normed_boxes_split_by_perms,
-                                                         clip_model)
+            clip_patch_features = self._bbox_clip_image(spanned_boxes, clip_images,
+                                                        seqs_split_by_group,
+                                                        normed_boxes_split_by_perms,
+                                                        clip_model)
         tik = time()
         storage.put_scalar("contrast_learning_time/clip_model_forward",
                            np.float32(tik-tok))
@@ -70,10 +70,6 @@ class ViLDContextModelling(CacheV2ContextModelling):
                    for b, img_id in zip(preds_split_by_batch,
                                         image_ids)]
         img_ids = torch.cat(img_ids).to(device)
-        normed_boxes = torch.cat(normed_boxes, dim=0).split(preds_split_by_perms, dim=0)
-        clip_patch_features = F.normalize(roi_align(
-            clip_image_tokens, normed_boxes, (1, 1),
-            float(clip_image_tokens.shape[-1]), 2, True)[..., 0, 0], dim=-1)
         tok = time()
         storage.put_scalar("contrast_learning_time/prepare_dense_features",
                            np.float32(tok - tik))
@@ -129,3 +125,34 @@ class ViLDContextModelling(CacheV2ContextModelling):
                              clip_patch_features=torch.cat([clip_patch_features,
                                                             img_ids.view(-1, 1)], dim=-1).detach())
         return losses, queues_update
+
+    @staticmethod
+    def denormalize_boxes(spanned_box, normalized_boxes):
+        spanned_wh = spanned_box[2:] - spanned_box[:2]
+        normalized_boxes = normalized_boxes.view(-1, 2)
+        boxes = normalized_boxes * spanned_wh[None]
+        boxes = spanned_box[None, :2] + boxes
+        return boxes.view(-1, 4)
+
+    @torch.no_grad()
+    def _bbox_clip_image(self, spanned_boxes, clip_images,
+                         seqs_split_by_group,
+                         normed_boxes_split_by_perms,
+                         clip_model):
+        denormed_boxes_list = []
+        for spanned_boxes_per_image, repeat_num_per_image, normed_boxes_per_image \
+                in zip(spanned_boxes, seqs_split_by_group, normed_boxes_split_by_perms):
+            repeated_spanned_boxes = []
+            for num, spanned_box in zip(repeat_num_per_image, spanned_boxes_per_image):
+                repeated_spanned_boxes.extend([spanned_box] * num)
+            denormed_boxes = list(map(self.denormalize_boxes, repeated_spanned_boxes,
+                                      normed_boxes_per_image))
+            denormed_boxes_list.append(torch.cat(denormed_boxes))
+
+        clip_input_size = self.cfg.INPUT_RESOLUTION
+        input_to_clip = roi_align(
+            clip_images.tensor, denormed_boxes_list, (clip_input_size, clip_input_size), 1.0, 2, True)
+        clip_img_features = clip_model.encode_image(
+            input_to_clip, normalize=True, return_image_tokens=False)
+
+        return clip_img_features.float()
