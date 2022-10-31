@@ -8,9 +8,10 @@ from torch import nn
 from detectron2.modeling.meta_arch.build import META_ARCH_REGISTRY
 from detectron2.modeling.meta_arch import ProposalNetwork
 from detectron2.modeling.postprocessing import detector_postprocess
-from detectron2.modeling import Backbone, build_backbone, build_proposal_generator
+from detectron2.modeling import Backbone
 from detic.modeling import context
 from detectron2.config import configurable
+from fvcore.transforms.transform import ScaleTransform
 
 __all__ = ["ContextProposalNetwork"]
 
@@ -63,14 +64,12 @@ class ContextProposalNetwork(ProposalNetwork):
                 The dict contains one key "proposals" whose value is a
                 :class:`Instances` with keys "proposal_boxes" and "objectness_logits".
         """
-        assert not self.training
-        images = [self._move_to_current_device(x["image"]) for x in batched_inputs]
+        assert not self.training, "only for inference"
+        images = [x["image"].to(self.device) for x in batched_inputs]
         images = [(x - self.pixel_mean) / self.pixel_std for x in images]
         images = ImageList.from_tensors(
             images,
-            self.backbone.size_divisibility,
-            padding_constraints=self.backbone.padding_constraints,
-        )
+            self.backbone.size_divisibility)
         features = self.backbone(images.tensor)
 
         if "instances" in batched_inputs[0]:
@@ -90,7 +89,9 @@ class ContextProposalNetwork(ProposalNetwork):
         image_infos = [dict(captions=b.get('captions', []),
                             image_id=b['image_id'],
                             pos_category_ids=b.get('pos_category_ids', []),
-                            transforms=b['transforms'],
+                            transforms=ScaleTransform(h=b['height'], w=b['width'],
+                                                      new_h=b['image'].shape[1],
+                                                      new_w=b['image'].shape[2]),
                             image_size=b['image'].shape[1:],
                             ori_image_size=(b['height'], b['width'])) for b in batched_inputs]
         proposals = self.sample_proposals(proposals, image_infos)
