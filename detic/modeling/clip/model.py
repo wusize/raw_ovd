@@ -73,7 +73,7 @@ class AttentionPool2d(nn.Module):
 
         if return_tokens:
             tokens = self.c_proj(                  # in_projection
-                self.v_proj(x[1:])).permute(1, 2, 0).contiguous().view(N, C, H, W)
+                self.v_proj(x[1:])).permute(1, 2, 0).contiguous().view(N, -1, H, W)
         else:
             tokens = None
 
