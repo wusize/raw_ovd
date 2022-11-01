@@ -177,7 +177,7 @@ import json
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_version', default='ViT-B/32')
+    parser.add_argument('--model_version', default='ViT-B/16')
     parser.add_argument('--ann', default='datasets/lvis/lvis_v1_only_val_norare.json')
     parser.add_argument('--out_path', default='datasets/metadata/lvis_clip_hand_craft.npy')
     parser.add_argument('--dataset', default='lvis')
@@ -185,7 +185,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     model, _ = CLIP.load(name=args.model_version,
-                         use_image_encoder=True,
+                         use_image_encoder=False,
                          download_root='models')
     model.init_weights()
     model.cuda()
@@ -194,12 +194,12 @@ if __name__ == '__main__':
     data = json.load(open(args.ann, 'r'))
     cat_names = [x['name'] for x in \
                  sorted(data['categories'], key=lambda x: x['id'])]
-
+    out_path = args.out_path.replace('.npy', f'{args.model_version}.npy')
     if args.dataset == 'lvis':
         text_embeddings = build_text_embedding_lvis(cat_names)
-        np.save(args.out_path, text_embeddings.cpu().numpy())
+        np.save(out_path, text_embeddings.cpu().numpy())
     else:
         clip_embeddings, attn12_embeddings = build_text_embedding_coco(cat_names)
 
-        np.save(args.out_path, clip_embeddings.cpu().numpy())
-        np.save(args.out_path.replace('.npy', '_attn12.npy'), attn12_embeddings.cpu().numpy())
+        np.save(out_path, clip_embeddings.cpu().numpy())
+        np.save(out_path.replace('.npy', '_attn12.npy'), attn12_embeddings.cpu().numpy())
