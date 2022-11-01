@@ -194,7 +194,7 @@ if __name__ == '__main__':
     data = json.load(open(args.ann, 'r'))
     cat_names = [x['name'] for x in \
                  sorted(data['categories'], key=lambda x: x['id'])]
-    out_path = args.out_path.replace('.npy', f'{args.model_version}.npy')
+    out_path = args.out_path
     if args.dataset == 'lvis':
         text_embeddings = build_text_embedding_lvis(cat_names, model)
         np.save(out_path, text_embeddings.cpu().numpy())
