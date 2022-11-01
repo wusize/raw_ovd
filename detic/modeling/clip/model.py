@@ -65,13 +65,18 @@ class AttentionPool2d(nn.Module):
         self.c_proj = nn.Linear(embed_dim, output_dim or embed_dim)
         self.num_heads = num_heads
 
-    def forward(self, x):
+    def forward(self, x, return_tokens=False, attn_masks=None):
         N, C, H, W = x.shape
         x = x.reshape(x.shape[0], x.shape[1], x.shape[2] * x.shape[3]).permute(2, 0, 1)  # NCHW -> (HW)NC
         x = torch.cat([x.mean(dim=0, keepdim=True), x], dim=0)  # (HW+1)NC
         x = x + self.positional_embedding[:, None, :].to(x.dtype)  # (HW+1)NC
-        image_tokens = self.c_proj(
-            self.v_proj(x[1:])).permute(1, 2, 0).contiguous().view(N, C, H, W)
+
+        if return_tokens:
+            tokens = self.c_proj(                  # in_projection
+                self.v_proj(x[1:])).permute(1, 2, 0).contiguous().view(N, C, H, W)
+        else:
+            tokens = None
+
         x, _ = F.multi_head_attention_forward(
             query=x, key=x, value=x,
             embed_dim_to_check=x.shape[-1],
@@ -89,10 +94,11 @@ class AttentionPool2d(nn.Module):
             out_proj_bias=self.c_proj.bias,
             use_separate_proj_weight=True,
             training=self.training,
-            need_weights=False
+            need_weights=False,
+            attn_mask=attn_masks
         )
 
-        return x[0], image_tokens
+        return x[0], tokens
 
 
 class ModifiedResNet(nn.Module):
@@ -137,7 +143,7 @@ class ModifiedResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, x):
+    def forward(self, x, return_tokens=False, attn_masks=None):
         def stem(x):
             for conv, bn in [(self.conv1, self.bn1), (self.conv2, self.bn2), (self.conv3, self.bn3)]:
                 x = self.relu(bn(conv(x)))
@@ -151,9 +157,12 @@ class ModifiedResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
-        x, image_tokens = self.attnpool(x)
-
-        return x, image_tokens
+        x, image_tokens = self.attnpool(x, return_tokens=return_tokens, attn_masks=attn_masks)
+        if return_tokens:
+            assert image_tokens is not None
+            return x, image_tokens
+        else:
+            return x
 
 
 class LayerNorm(nn.LayerNorm):
@@ -369,6 +378,7 @@ class CLIP(nn.Module):
 
     def init_weights(self):
         print(f'Initiate clip parameters by loading {self.state_file}', flush=True)
+        print(f'Input resolution: {self.input_resolution}', flush=True)
         state_dict = torch.jit.load(self.state_file).state_dict()
         self.load_state_dict(state_dict, strict=False)
         self.eval()
@@ -414,8 +424,10 @@ class CLIP(nn.Module):
 
     @property
     def dtype(self):
-        # return self.visual.conv1.weight.dtype
-        return torch.float16
+        if self.visual is not None:
+            return self.visual.conv1.weight.dtype
+        else:
+            return torch.float16
 
     def encode_image(self, image, normalize=True, return_image_tokens=False, attn_masks=None):
         assert self.use_image_encoder

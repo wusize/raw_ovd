@@ -338,7 +338,7 @@ class ContextModelling(nn.Module):
                          clip_model):
         # TODO: repeat and mask
         num_groups_per_image = [b.shape[0] for b in spanned_boxes]
-        clip_input_size = self.cfg.INPUT_RESOLUTION
+        clip_input_size = clip_model.input_resolution  # self.cfg.INPUT_RESOLUTION
         input_to_clip = roi_align(
             clip_images.tensor, spanned_boxes, (clip_input_size, clip_input_size), 1.0, 2, True)
         input_to_clip = input_to_clip.split(num_groups_per_image, dim=0)
