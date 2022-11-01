@@ -45,6 +45,8 @@ DATASETS:
   TRAIN: ("coco_zeroshot_train_oriorder",)
   TEST: ("coco_generalized_zeroshot_val",)
 SOLVER:
+  CLIP_GRADIENTS:
+    ENABLED: True
   IMS_PER_BATCH: 16
   BASE_LR: 0.02
   STEPS: (60000, 80000)
