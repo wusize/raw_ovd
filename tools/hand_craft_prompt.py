@@ -104,7 +104,7 @@ multiple_templates = [
 ]
 
 
-def build_text_embedding_coco(categories):
+def build_text_embedding_coco(categories, model):
     templates = multiple_templates
     with torch.no_grad():
         zeroshot_weights = []
@@ -136,7 +136,7 @@ def build_text_embedding_coco(categories):
     return zeroshot_weights, attn12_weights
 
 
-def build_text_embedding_lvis(categories):
+def build_text_embedding_lvis(categories, model):
     templates = multiple_templates
 
     with torch.no_grad():
@@ -196,10 +196,10 @@ if __name__ == '__main__':
                  sorted(data['categories'], key=lambda x: x['id'])]
     out_path = args.out_path.replace('.npy', f'{args.model_version}.npy')
     if args.dataset == 'lvis':
-        text_embeddings = build_text_embedding_lvis(cat_names)
+        text_embeddings = build_text_embedding_lvis(cat_names, model)
         np.save(out_path, text_embeddings.cpu().numpy())
     else:
-        clip_embeddings, attn12_embeddings = build_text_embedding_coco(cat_names)
+        clip_embeddings, attn12_embeddings = build_text_embedding_coco(cat_names, model)
 
         np.save(out_path, clip_embeddings.cpu().numpy())
         np.save(out_path.replace('.npy', '_attn12.npy'), attn12_embeddings.cpu().numpy())
