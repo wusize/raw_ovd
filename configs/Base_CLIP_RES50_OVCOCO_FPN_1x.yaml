@@ -3,9 +3,9 @@ MODEL:
     NAME: "CustomRPN"
   META_ARCHITECTURE: "CustomRCNN"
   BACKBONE:
+    FREEZE_AT: 5
     NAME: "build_clip_resnet_fpn_backbone"
   RESNETS:
-    FREEZE_AT: 5
     OUT_FEATURES: [ "res2", "res3", "res4", "res5" ]
   FPN:
     IN_FEATURES: [ "res2", "res3", "res4", "res5" ]
