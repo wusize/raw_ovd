@@ -1,4 +1,4 @@
-_BASE_: "./Base_OVCOCO_FPN_1x_soco.yaml"
+_BASE_: "./VITB32_OVCOCO_FPN_2x_soco.yaml"
 MODEL:
   RPN:
     HEAD_NAME: "DetachRPNHead"
