@@ -323,6 +323,7 @@ class CLIP(nn.Module):
                  vision_width: int,
                  vision_patch_size: int,
                  # text
+                 use_text_encoder: bool,
                  context_length: int,
                  vocab_size: int,
                  transformer_width: int,
@@ -334,6 +335,7 @@ class CLIP(nn.Module):
         self.state_file = state_file
         self.context_length = context_length
         self.use_image_encoder = use_image_encoder
+        self.use_text_encoder = use_text_encoder
         self.input_resolution = image_resolution
         if use_image_encoder:
             if isinstance(vision_layers, (tuple, list)):
@@ -357,38 +359,37 @@ class CLIP(nn.Module):
                 )
         else:
             self.visual = None
+        if self.use_text_encoder:
+            self.transformer = Transformer(
+                width=transformer_width,
+                layers=transformer_layers,
+                heads=transformer_heads,
+                attn_mask=self.build_attention_mask()
+            )
+            self.tokenizer = SimpleTokenizer()
+            self.sot_token = self.tokenizer.encoder["<|startoftext|>"]
+            self.eot_token = self.tokenizer.encoder["<|endoftext|>"]
+            self.vocab_size = vocab_size
+            self.token_embedding = nn.Embedding(vocab_size, transformer_width)
+            self.positional_embedding = nn.Parameter(torch.empty(self.context_length, transformer_width))
+            self.ln_final = LayerNorm(transformer_width)
 
-        self.transformer = Transformer(
-            width=transformer_width,
-            layers=transformer_layers,
-            heads=transformer_heads,
-            attn_mask=self.build_attention_mask()
-        )
-        self.tokenizer = SimpleTokenizer()
-        self.sot_token = self.tokenizer.encoder["<|startoftext|>"]
-        self.eot_token = self.tokenizer.encoder["<|endoftext|>"]
-        self.vocab_size = vocab_size
-        self.token_embedding = nn.Embedding(vocab_size, transformer_width)
-        self.positional_embedding = nn.Parameter(torch.empty(self.context_length, transformer_width))
-        self.ln_final = LayerNorm(transformer_width)
-
-        self.text_projection = nn.Parameter(torch.empty(transformer_width, embed_dim))
+            self.text_projection = nn.Parameter(torch.empty(transformer_width, embed_dim))
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
 
         self.initialize_parameters()
 
-    def init_weights(self):
+    def init_weights(self, fix_params=True):
         print(f'Initiate clip parameters by loading {self.state_file}', flush=True)
         print(f'Input resolution: {self.input_resolution}', flush=True)
         state_dict = torch.jit.load(self.state_file).state_dict()
         self.load_state_dict(state_dict, strict=False)
-        self.eval()
-        for param in self.parameters():
-            param.requires_grad = False
+        if fix_params:
+            self.eval()
+            for param in self.parameters():
+                param.requires_grad = False
 
     def initialize_parameters(self):
-        nn.init.normal_(self.token_embedding.weight, std=0.02)
-        nn.init.normal_(self.positional_embedding, std=0.01)
         if self.visual:
             if isinstance(self.visual, ModifiedResNet):
                 if self.visual.attnpool is not None:
@@ -402,18 +403,20 @@ class CLIP(nn.Module):
                     for name, param in resnet_block.named_parameters():
                         if name.endswith("bn3.weight"):
                             nn.init.zeros_(param)
+        if self.use_text_encoder:
+            nn.init.normal_(self.token_embedding.weight, std=0.02)
+            nn.init.normal_(self.positional_embedding, std=0.01)
+            proj_std = (self.transformer.width ** -0.5) * ((2 * self.transformer.layers) ** -0.5)
+            attn_std = self.transformer.width ** -0.5
+            fc_std = (2 * self.transformer.width) ** -0.5
+            for block in self.transformer.resblocks:
+                nn.init.normal_(block.attn.in_proj_weight, std=attn_std)
+                nn.init.normal_(block.attn.out_proj.weight, std=proj_std)
+                nn.init.normal_(block.mlp.c_fc.weight, std=fc_std)
+                nn.init.normal_(block.mlp.c_proj.weight, std=proj_std)
 
-        proj_std = (self.transformer.width ** -0.5) * ((2 * self.transformer.layers) ** -0.5)
-        attn_std = self.transformer.width ** -0.5
-        fc_std = (2 * self.transformer.width) ** -0.5
-        for block in self.transformer.resblocks:
-            nn.init.normal_(block.attn.in_proj_weight, std=attn_std)
-            nn.init.normal_(block.attn.out_proj.weight, std=proj_std)
-            nn.init.normal_(block.mlp.c_fc.weight, std=fc_std)
-            nn.init.normal_(block.mlp.c_proj.weight, std=proj_std)
-
-        if self.text_projection is not None:
-            nn.init.normal_(self.text_projection, std=self.transformer.width ** -0.5)
+            if self.text_projection is not None:
+                nn.init.normal_(self.text_projection, std=self.transformer.width ** -0.5)
 
     def build_attention_mask(self):
         # lazily create causal attention mask, with full attention between the vision tokens
@@ -664,7 +667,7 @@ def convert_weights(model: nn.Module):
     model.apply(_convert_weights_to_fp16)
 
 
-def build_model(state_dict, state_file, use_image_encoder, **kwargs):
+def build_model(state_dict, state_file, use_image_encoder, use_text_encoder=True, **kwargs):
     vit = "visual.proj" in state_dict
 
     if vit:
@@ -699,6 +702,7 @@ def build_model(state_dict, state_file, use_image_encoder, **kwargs):
         vision_width=vision_width,
         vision_patch_size=vision_patch_size,
         # text
+        use_text_encoder=use_text_encoder,
         context_length=context_length,
         vocab_size=vocab_size,
         transformer_width=transformer_width,

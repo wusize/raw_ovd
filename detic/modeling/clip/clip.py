@@ -24,7 +24,7 @@ if packaging.version.parse(torch.__version__) < packaging.version.parse("1.7.1")
     warnings.warn("PyTorch version 1.7.1 or higher is recommended")
 
 
-__all__ = ["available_models", "load", "tokenize", "tokenize_dynamic"]
+__all__ = ["available_models", "load", "tokenize", "tokenize_dynamic", "get_only_word_tokens"]
 _tokenizer = _Tokenizer()
 
 _MODELS = {
@@ -140,7 +140,8 @@ def load(name: str,
 
     if not jit:
         model = build_model(state_dict=state_dict or model.state_dict(), state_file=model_path,
-                            use_image_encoder=use_image_encoder).to(device)
+                            use_image_encoder=use_image_encoder,
+                            use_text_encoder=use_text_encoder).to(device)
         if str(device) == "cpu":
             model.float()
         return model, None
@@ -258,3 +259,12 @@ def tokenize_dynamic(texts, context_length: int = 77, truncate: bool = False):
         result[i, :len(tokens)] = torch.tensor(tokens)
 
     return result
+
+
+def get_only_word_tokens(texts):
+    if isinstance(texts, str):
+        texts = [texts]
+
+    all_tokens = [_tokenizer.encode(text) for text in texts]
+
+    return all_tokens
