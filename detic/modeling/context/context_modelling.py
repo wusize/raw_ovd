@@ -127,6 +127,7 @@ class ContextModelling(nn.Module):
         self.num_words_per_pred = num_words
         self.word_embed_dim = word_embed_dim
         self.word_dropout = word_dropout
+        self.out_dim = cfg.OUT_DIM
         self.cfg = cfg
         checkboard_cfg = cfg.CHECKBOARD
         if sigmoid:
@@ -150,7 +151,7 @@ class ContextModelling(nn.Module):
             self.token_temp = cfg.TOKEN_TEMP  # 50.0
             self.bce_bias = nn.Parameter(torch.tensor(0.0))
 
-            self.queues = Queues(queue_cfg=self.cfg.QUEUE)
+            self.queues = Queues(queue_cfg=self.cfg.QUEUE, emb_dim=self.out_dim)
             if self.cfg.POSITIONAL_ENCODING:
                 self.positional_embed = SinePositionalEncoding(num_feats=128,
                                                                num_words=num_words,
@@ -590,7 +591,7 @@ class ContextModelling(nn.Module):
 
         if all_clip_caption_features is None:
             caption_valid = torch.zeros(batch_size, device=device)
-            clip_caption_features = torch.zeros(batch_size, 512, device=device)
+            clip_caption_features = torch.zeros(batch_size, self.out_dim, device=device)
             caption_img_ids = torch.tensor(image_ids, device=device,
                                            dtype=torch.float32)
         else:
@@ -609,7 +610,7 @@ class ContextModelling(nn.Module):
                     clip_caption_features_list.append(cap_feat[sampled_ids])
                     caption_img_ids.append(img_id * torch.ones(num_samples, device=device))
                 else:
-                    clip_caption_features_list.append(torch.zeros(1, 512, device=device))
+                    clip_caption_features_list.append(torch.zeros(1, self.out_dim, device=device))
                     caption_valid.append(torch.zeros(1, device=device))
                     caption_img_ids.append(img_id * torch.ones(1, device=device))
             caption_valid = torch.cat(caption_valid)
@@ -662,7 +663,7 @@ class ContextModelling(nn.Module):
         loss = loss_0 * 0.5 + loss_1 * 0.5
 
         if all_clip_caption_features is None:
-            clip_caption_features_update = -torch.ones(1, 512 + 1, device=device)
+            clip_caption_features_update = -torch.ones(1, self.out_dim + 1, device=device)
         else:
             all_cap_image_ids = [img_id for img_id, num_cap in zip(image_ids, num_captions_per_image)
                                  for _ in range(num_cap)]

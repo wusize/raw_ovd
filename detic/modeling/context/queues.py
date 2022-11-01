@@ -10,16 +10,17 @@ from detectron2.structures.boxes import pairwise_ioa
 
 
 class Queues(nn.Module):
-    def __init__(self, queue_cfg):
+    def __init__(self, queue_cfg, emb_dim=512):
         super(Queues, self).__init__()
         self.queue_cfg = queue_cfg
+        self.emb_dim = emb_dim
         self._init_queues()
 
     def _init_queues(self):
         attr_names = self.queue_cfg.NAMES
         queue_lengths = self.queue_cfg.LENGTHS
         for n in attr_names:
-            self.register_buffer(n, torch.zeros(0, 512 + 1),
+            self.register_buffer(n, torch.zeros(0, self.emb_dim + 1),
                                  persistent=False)
         self.queue_lengths = {n: queue_lengths[i] for i, n in enumerate(attr_names)}
 
