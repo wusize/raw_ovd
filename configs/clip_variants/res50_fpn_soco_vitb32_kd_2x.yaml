@@ -1,0 +1,43 @@
+_BASE_: "./Base_OVCOCO_FPN_1x_soco.yaml"
+MODEL:
+  RPN:
+    HEAD_NAME: "DetachRPNHead"
+  PROPOSAL_GENERATOR:
+    NAME: "CustomRPN"
+  CLIP:
+    USE_IMAGE_ENCODER: True
+  WITH_IMAGE_LABELS: False
+CONTEXT_MODELLING:
+  SAVE_CACHE: False
+  START_CACHE: 10000
+  VERSION: "CacheV2"
+  ANN_PATH: "datasets/coco/zero-shot/instances_train2017_seen_2_oriorder_with_cap.json"
+  ENABLE: True
+  CONTRAST_LOSS_WEIGHT: 1.0
+  TOKEN_LOSS_WEIGHT: 0.1
+  TOPK: 300
+  OBJECTNESS_THR: 0.85
+  SHAPE_RATIO_THR: 0.25
+  POSITIONAL_ENCODING: True
+  CE_TEMP: 30.0
+  TOKEN_TEMP: 50.0
+  CHECKBOARD:
+    ENABLE: True
+    NMS_THR: 0.1
+    AREA_RATIO_THR: 0.01
+    BASE_PROBABILITY: 0.3
+    MAX_GROUPS: 3
+    MAX_PERMUTATIONS: 2
+    ALPHA: 3.0
+    INTERVAL: -0.1
+    CUT_OFF_THR: 0.3
+    LOCAL_CORRESPONDENCE: True
+  CAPTION:
+    ENABLE: False
+  QUEUE:
+    LENGTHS: [1024, 1024, 1024, 1024]
+    NAMES: ['clip_text_features', 'clip_image_features', 'clip_word_features', 'clip_patch_features']
+TEST:
+  EVAL_PERIOD: 10000
+DATALOADER:
+  FILTER_EMPTY_ANNOTATIONS: False
