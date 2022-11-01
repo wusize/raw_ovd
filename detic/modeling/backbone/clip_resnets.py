@@ -34,7 +34,7 @@ class CLIPResNet(Backbone):
                                   use_text_encoder=False,
                                   download_root=clip_cfg.MODEL_ROOT)
         clip_model.init_weights(fix_params=False)
-        self.resnet = clip_model.visual
+        self.resnet = clip_model.visual.float()
         del self.resnet.attnpool
         self.stage_names = ("res2", "res3", "res4", "res5")
         if out_features is None:
