@@ -199,8 +199,6 @@ if __name__ == '__main__':
         text_embeddings = build_text_embedding_lvis(cat_names, model)
         np.save(out_path, text_embeddings.cpu().numpy())
     elif args.dataset == 'objects365':
-        from detic.data.datasets.objects365 import categories_v2_fix
-        cat_names = [x['name'] for x in categories_v2_fix]
         text_embeddings = build_text_embedding_lvis(cat_names, model)
         np.save(out_path, text_embeddings.cpu().numpy())
     else:
