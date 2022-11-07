@@ -379,7 +379,7 @@ def _get_builtin_metadata():
 
 _PREDEFINED_SPLITS_OBJECTS365 = {
     "wusize_objects365_train": ("objects365/train", "objects365/annotations/objects365_train.json"),
-    "wusize_objects365_val": ("objects365/val", "objects365/annotations/objects365_val.json"),
+    "wusize_objects365_val": ("objects365/val", "objects365/annotations/zhiyuan_objv2_val.json"),
 }
 
 for key, (image_root, json_file) in _PREDEFINED_SPLITS_OBJECTS365.items():
