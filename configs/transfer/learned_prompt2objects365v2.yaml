@@ -1,0 +1,24 @@
+_BASE_: "./base_res50_fpn_lvis_2x.yaml"
+MODEL:
+  MASK_ON: False
+  ROI_HEADS:
+    NUM_CLASSES: 365
+    SCORE_THRESH_TEST: 0.00001
+    NAME: EnsembleStandardROIHeads
+  ROI_BOX_HEAD:
+    NORM_TEMP: 100.0
+    MASK_VALUE: -100.0
+    TRANSFER: 0.7
+    ALL_ENCODER: True
+    CAT_FREQ_PATH: 'datasets/coco/zero-shot/instances_train2017_seen_2_oriorder_cat_info.json'
+    ZEROSHOT_WEIGHT_PATH: "datasets/metadata/fg_bg_5_10_obj365v2_ens.npy"
+  CLIP:
+    USE_IMAGE_ENCODER: False
+CONTEXT_MODELLING:
+  ENABLE: True
+TEST:
+  DETECTIONS_PER_IMAGE: 300
+  EVAL_PERIOD: 30000
+DATASETS:
+  TRAIN: ("wusize_objects365_train",)
+  TEST: ("wusize_objects365_val",)
