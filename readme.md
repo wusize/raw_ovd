@@ -1,6 +1,7 @@
 # Dependencies
 detectron2
 # Data
+## format
 ```
 ├─ raw_ovd
     ├─datasets
@@ -20,8 +21,18 @@ detectron2
         │-- ViT-B-32.pt
         │-- coco_kd_best_34.0.pth
         │-- lvis_kd_best_22.8.pth
-  
 ```
+## Obtain data and cpts
+For object365
+```
+wget https://dorc.ks3-cn-beijing.ksyun.com/data-set/2020Objects365%E6%95%B0%E6%8D%AE%E9%9B%86/val/zhiyuan_objv2_val.json
+```
+For COCO
+[google drive](https://drive.google.com/file/d/1K4T0Q-rhzl09RkhKsur6xWqs31HSx3fB/view?usp=sharing)
+For cpts
+[Jinsheng](https://connecthkuhk-my.sharepoint.com/:f:/g/personal/js20_connect_hku_hk/EingbMkSjIZKu8PObuGte_wBTPGOeV5M88C_Xq34qewiNQ?e=JtHRYv)
+
+
 # Run
 ## COCO
 ```
