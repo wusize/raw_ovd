@@ -79,7 +79,7 @@ class CustomRCNN(GeneralizedRCNN):
 
         images = self.preprocess_image(batched_inputs)
         features = self.backbone(images.tensor)
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         proposals, _ = self.proposal_generator(images, features, None)
         results, _ = self.roi_heads(images, features, proposals)
         if self.cfg.MODEL.SAVE_PROPOSALS:
