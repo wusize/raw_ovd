@@ -7,6 +7,7 @@ import torch
 from detectron2.structures import Instances, PolygonMasks, Boxes
 import math
 import numpy as np
+from detectron2.utils.events import get_event_storage
 
 
 class GridSampling(StochasticSampling):
@@ -32,7 +33,7 @@ class OVRCNNContextModelling(ContextModelling):
 
 class CaptionLikeContextModelling(CacheV2ContextModelling):
 
-    def _checkboard_sampling(self, topk_proposals, mask_on=False):
+    def _checkboard_sampling(self, topk_proposals, mask_on=False, image_info=None):
         if not self.checkboard_cfg.ENABLE:
             return topk_proposals[:0], None
         device = topk_proposals.proposal_boxes.device
@@ -54,6 +55,13 @@ class CaptionLikeContextModelling(CacheV2ContextModelling):
                                                self.cfg.OBJECTNESS_THR,
                                                self.checkboard_cfg.NMS_THR)
         nmsed_proposals.sample_types[:] = 1    # clip_kd_samples: 1
+        if image_info is not None:
+            storage = get_event_storage()
+            iter = storage.iter
+            # print(f'Device: {comm.get_rank()}, iter: {iter}', flush=True)
+            if iter > self.cfg.START_CACHE:
+                nmsed_proposals = self.boxes_cache.update(image_info, nmsed_proposals,
+                                                          self.cfg.OBJECTNESS_THR)
         num_nmsed = len(nmsed_proposals)
         if num_nmsed > 9:
             kept_ids = random.sample(range(num_nmsed), k=9)
