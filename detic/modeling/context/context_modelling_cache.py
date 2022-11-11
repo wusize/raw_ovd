@@ -1,3 +1,5 @@
+import random
+
 import torch
 from .utils import multi_apply
 from detectron2.structures import Instances, Boxes
@@ -114,6 +116,13 @@ class CacheV2ContextModelling(CacheContextModelling):
                                                           self.cfg.OBJECTNESS_THR)
         # TODO: merge with cached samples by nms
         # name: "kd_proposals"
+        MAX_VALID_PROPOSALS = self.cfg.MAX_VALID_PROPOSALS
+        if len(nmsed_proposals) > MAX_VALID_PROPOSALS:
+            # shuffle the proposals
+            shuffled_ids = list(range(len(nmsed_proposals)))
+            random.shuffle(shuffled_ids)
+            nmsed_proposals = nmsed_proposals[shuffled_ids]
+            nmsed_proposals = nmsed_proposals[:MAX_VALID_PROPOSALS]
 
         func = self.checkboard_sampling.sample
         boxes = nmsed_proposals.proposal_boxes.tensor.tolist()

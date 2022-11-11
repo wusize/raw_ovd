@@ -45,3 +45,11 @@ python train_net.py --num-gpus 8 --config-file \\
 configs/transfer/learned_prompt2objects365v2.yaml --eval-only \\
 MODEL.WEIGHTS models/lvis_kd_best_22.8.pth
 ```
+## Train the reduced sampling strategy
+
+Obtain the 
+
+```
+python train_net.py --num-gpus 8 --config-file configs/sampling/reduce_num_of_regions.yaml \\
+MODEL.WEIGHTS path/to/the/soco_pretrained_model.pkl
+```
