@@ -1,0 +1,34 @@
+_BASE_: "./faster_rcnn_R_101_FPN_3x.yaml"
+MODEL:
+  CLIP:
+    USE_IMAGE_ENCODER: True
+  WITH_IMAGE_LABELS: False
+CONTEXT_MODELLING:
+  VERSION: 'CacheV2'
+  START_CACHE: 10000
+  ENABLE: True
+  CONTRAST_LOSS_WEIGHT: 1.0
+  TOKEN_LOSS_WEIGHT: 0.1
+  USE_ATTN_MASK: False                 # disabling attn_mask can improve performance on novel
+  TOPK: 300
+  OBJECTNESS_THR: 0.85
+  SHAPE_RATIO_THR: 0.25
+  POSITIONAL_ENCODING: True
+  CE_TEMP: 30.0
+  TOKEN_TEMP: 50.0
+  CHECKBOARD:
+    ENABLE: True
+    NMS_THR: 0.1
+    AREA_RATIO_THR: 0.01
+    BASE_PROBABILITY: 0.3
+    MAX_GROUPS: 3
+    MAX_PERMUTATIONS: 2
+    ALPHA: 3.0
+    INTERVAL: -0.10
+    CUT_OFF_THR: 0.3
+    LOCAL_CORRESPONDENCE: True
+  CAPTION:
+    ENABLE: False
+  QUEUE:
+    LENGTHS: [1024, 1024, 1024, 1024]
+    NAMES: ['clip_text_features', 'clip_image_features', 'clip_word_features', 'clip_patch_features']
