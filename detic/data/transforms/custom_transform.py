@@ -84,15 +84,14 @@ class EfficientDetResizeCropTransform(Transform):
         coords[:, 1] -= self.offset_y
         return coords
 
-
     def apply_segmentation(self, segmentation):
         segmentation = self.apply_image(segmentation, interp=Image.NEAREST)
         return segmentation
 
-
     def inverse(self):
-        raise NotImplementedError
-
+        return inverse_transform(self.scaled_h, self.scaled_w,
+                                 self.offset_y, self.offset_x,
+                                 self.img_scale, self.target_size, self.interp)
 
     def inverse_apply_coords(self, coords):
         coords[:, 0] += self.offset_x
@@ -100,7 +99,6 @@ class EfficientDetResizeCropTransform(Transform):
         coords[:, 0] = coords[:, 0] / self.img_scale
         coords[:, 1] = coords[:, 1] / self.img_scale
         return coords
-
 
     def inverse_apply_box(self, box: np.ndarray) -> np.ndarray:
         """
@@ -112,3 +110,46 @@ class EfficientDetResizeCropTransform(Transform):
         maxxy = coords.max(axis=1)
         trans_boxes = np.concatenate((minxy, maxxy), axis=1)
         return trans_boxes
+
+
+class inverse_transform(Transform):
+    def __init__(self, scaled_h, scaled_w, offset_y, offset_x, img_scale, \
+        target_size, interp=None):
+        """
+        Args:
+            h, w (int): original image size
+            new_h, new_w (int): new image size
+            interp: PIL interpolation methods, defaults to bilinear.
+        """
+        # TODO decide on PIL vs opencv
+        super().__init__()
+        if interp is None:
+            interp = Image.BILINEAR
+        self._set_attributes(locals())
+
+    def apply_coords(self, coords):
+        coords[:, 0] += self.offset_x
+        coords[:, 1] += self.offset_y
+        coords[:, 0] = coords[:, 0] / self.img_scale
+        coords[:, 1] = coords[:, 1] / self.img_scale
+        return coords
+
+    def apply_box(self, box) -> np.ndarray:
+        """
+        """
+        idxs = np.array([(0, 1), (2, 1), (0, 3), (2, 3)]).flatten()
+        coords = np.asarray(box).reshape(-1, 4)[:, idxs].reshape(-1, 2)
+        coords = self.apply_coords(coords).reshape((-1, 4, 2))
+        minxy = coords.min(axis=1)
+        maxxy = coords.max(axis=1)
+        trans_boxes = np.concatenate((minxy, maxxy), axis=1)
+        return trans_boxes
+
+    def inverse(self):
+        raise NotImplementedError
+
+    def apply_segmentation(self, segmentation):
+        raise NotImplementedError
+
+    def apply_image(self, img, interp=None):
+        raise NotImplementedError
