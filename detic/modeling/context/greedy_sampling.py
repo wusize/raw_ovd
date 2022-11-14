@@ -2,7 +2,6 @@ import random
 import torch
 import math
 from detic.modeling.context.context_modelling import pseudo_permutations
-from detic.modeling.context.baseline import get_normed_boxes
 from .utils import multi_apply
 def get_enclosing_box(boxes):
     # Nx4
@@ -10,6 +9,14 @@ def get_enclosing_box(boxes):
     x_y_max = boxes[:, :2].max(dim=0).values
 
     return torch.cat([x_y_min, x_y_max])
+
+def get_normed_boxes(boxes, spanned_box):
+    spanned_box_shape = spanned_box[2:] - spanned_box[:2]
+    boxes = boxes.view(-1, 2, 2) - spanned_box[:2].view(1, 1, 2)
+    boxes = boxes / (spanned_box_shape.view(1, 1, 2) + 1e-12)
+
+    return boxes.reshape(-1, 4)
+
 
 def fp16_clamp(x, min=None, max=None):
     if not x.is_cuda and x.dtype == torch.float16:
