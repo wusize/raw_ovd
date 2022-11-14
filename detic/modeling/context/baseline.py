@@ -8,6 +8,7 @@ from detectron2.structures import Instances, PolygonMasks, Boxes
 import math
 import numpy as np
 from detectron2.utils.events import get_event_storage
+from .greedy_sampling import sparse_dense_grouping
 
 
 class GridSampling(StochasticSampling):
@@ -158,6 +159,74 @@ class CaptionLikeV2ContextModelling(CaptionLikeContextModelling):
         normed_boxes = [[[normed_nmsed_boxes[p] for p in perms], ], ]
         box_ids = [perms, ]
 
+        num_added = len(new_boxes)
+        added_instances = Instances(image_size=nmsed_proposals.image_size,
+                                    proposal_boxes=Boxes(new_boxes),
+                                    objectness_logits=-torch.ones(num_added, device=device),
+                                    gt_classes=-torch.ones(num_added, device=device,
+                                                           dtype=torch.int64),
+                                    gt_boxes=Boxes(torch.zeros(num_added, 4, device=device)),
+                                    sample_types=torch.ones(num_added, device=device).int())   # clip_kd: 1
+        if mask_on:
+            added_instances.set('gt_masks',
+                                PolygonMasks([[np.asarray([0.0, 0.0, 0.0, 1.0, 1.0, 0.0])]] * num_added))
+
+        return added_instances, dict(normed_boxes=normed_boxes,
+                                     spanned_boxes=spanned_boxes,
+                                     box_ids=box_ids)
+
+
+class GrabContextModelling(CaptionLikeContextModelling):
+    def _checkboard_sampling(self, topk_proposals, mask_on=False, image_info=None):
+        if not self.checkboard_cfg.ENABLE:
+            return topk_proposals[:0], None
+        device = topk_proposals.proposal_boxes.device
+        h, w = topk_proposals.image_size
+        image_box = torch.tensor([0.0, 0.0, w - 1.0, h - 1.0], device=device)
+        if len(topk_proposals) == 0:
+            topk_proposals = Instances(image_size=topk_proposals.image_size,
+                                       proposal_boxes=Boxes(image_box.view(-1, 4)),
+                                       objectness_logits=-torch.ones(1, device=device),
+                                       gt_classes=-torch.ones(1, device=device, dtype=torch.int64),
+                                       gt_boxes=Boxes(torch.zeros(1, 4, device=device)),
+                                       sample_types=-torch.ones(1, device=device).int())
+            if mask_on:
+                topk_proposals.set('gt_masks',
+                                   PolygonMasks([[np.asarray([0.0, 0.0, 0.0, 1.0, 1.0, 0.0]), ], ]))
+        nmsed_proposals = self.preprocess_proposals(topk_proposals,
+                                                    self.cfg.SHAPE_RATIO_THR,
+                                                    self.checkboard_cfg.AREA_RATIO_THR,
+                                                    self.cfg.OBJECTNESS_THR,
+                                                    self.checkboard_cfg.NMS_THR)    # keep as center_boxes
+        dense_proposals = self.preprocess_proposals(topk_proposals,
+                                                    self.cfg.SHAPE_RATIO_THR,
+                                                    self.checkboard_cfg.AREA_RATIO_THR,
+                                                    self.cfg.GRAB.DENSE_OBJECTNESS_THR,
+                                                    self.cfg.GRAB.DENSE_NMS_THR)
+        nmsed_proposals.sample_types[:] = 1    # clip_kd_samples: 1
+        if image_info is not None:
+            storage = get_event_storage()
+            iter = storage.iter
+            # print(f'Device: {comm.get_rank()}, iter: {iter}', flush=True)
+            if iter > self.cfg.START_CACHE:
+                nmsed_proposals = self.boxes_cache.update(image_info, nmsed_proposals,
+                                                          self.cfg.OBJECTNESS_THR)
+
+        MAX_VALID_PROPOSALS = self.cfg.MAX_VALID_PROPOSALS
+        if len(nmsed_proposals) > MAX_VALID_PROPOSALS:
+            # shuffle the proposals
+            shuffled_ids = list(range(len(nmsed_proposals)))
+            random.shuffle(shuffled_ids)
+            nmsed_proposals = nmsed_proposals[shuffled_ids]
+            nmsed_proposals = nmsed_proposals[:MAX_VALID_PROPOSALS]
+
+        new_boxes, spanned_boxes, normed_boxes, box_ids = sparse_dense_grouping(
+            nmsed_proposals.proposal_boxes.tensor,
+            dense_proposals.proposal_boxes.tensor,
+            self.cfg.GRAB.GIOU_THR,
+            self.cfg.GRAB.MAX_CANDIDATES,
+            self.cfg.GRAB.NUM_PERMS)
+        new_boxes = torch.cat(new_boxes)
         num_added = len(new_boxes)
         added_instances = Instances(image_size=nmsed_proposals.image_size,
                                     proposal_boxes=Boxes(new_boxes),

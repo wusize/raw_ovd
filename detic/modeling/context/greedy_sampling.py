@@ -1,5 +1,10 @@
 import random
 import torch
+from detic.modeling.context.baseline import get_enclosing_box
+import math
+from detic.modeling.context.context_modelling import pseudo_permutations
+from detic.modeling.context.baseline import get_normed_boxes
+from .utils import multi_apply
 
 
 def fp16_clamp(x, min=None, max=None):
@@ -108,6 +113,32 @@ def greedy_grouping(boxes, giou_thr):
         boxes = boxes[giou_with_boxes <= giou_thr]
 
     return groups
+
+
+def sparse_dense_grouping(center_boxes, dense_boxes, giou_thr, max_num, num_perms):
+    return multi_apply(_sparse_dense_grouping_single, center_boxes,
+                       dense_boxes=dense_boxes, giou_thr=giou_thr, max_num=max_num,
+                       num_perms=num_perms
+                       )
+
+
+def _sparse_dense_grouping_single(center_box, dense_boxes, giou_thr, max_num, num_perms):
+    gious = bbox_overlaps(center_box[None], dense_boxes, mode='giou')
+    valid_candidates = torch.where(gious >= giou_thr)[0].tolist()
+    if len(valid_candidates) > max_num:
+        valid_candidates = random.sample(valid_candidates, k=max_num)
+
+    sampled_boxes = dense_boxes[valid_candidates]
+    grouped_boxes = torch.cat([center_box[None], sampled_boxes], dim=0)
+    spanned_box = get_enclosing_box(grouped_boxes)
+    normed_boxes = get_normed_boxes(grouped_boxes, spanned_box)
+
+    num_regions = len(grouped_boxes)
+
+    perms = pseudo_permutations(num_regions, min(math.factorial(num_regions), num_perms))
+    permed_normed_boxes = [normed_boxes[p] for p in perms]
+
+    return torch.cat([grouped_boxes[p] for p in perms]), [spanned_box, ], [permed_normed_boxes, ], perms
 
 
 if __name__ == '__main__':
