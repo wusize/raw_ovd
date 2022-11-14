@@ -1,0 +1,40 @@
+_BASE_: "./faster_rcnn_R_50_FPN_lvis_3x.yaml"
+INPUT:
+  CUSTOM_AUG: EfficientDetResizeCrop
+  TRAIN_SIZE: 1024
+  SCALE_RANGE: (0.5, 2.0)
+MODEL:
+  ROI_HEADS:
+    NAME: EnsembleStandardROIHeads
+    SCORE_THRESH_TEST: 0.0001
+  ROI_BOX_HEAD:
+    ENSEMBLE_FACTOR: 0.666666666666666
+  CLIP:
+    USE_IMAGE_ENCODER: True
+CONTEXT_MODELLING:
+  USE_ATTN_MASK: False                 # disabling attn_mask can improve performance on novel
+  ENABLE: True
+  CONTRAST_LOSS_WEIGHT: 1.0
+  TOKEN_LOSS_WEIGHT: 0.1
+  TOPK: 500
+  OBJECTNESS_THR: 0.85
+  SHAPE_RATIO_THR: 0.25
+  POSITIONAL_ENCODING: True
+  CE_TEMP: 20.0
+  TOKEN_TEMP: 30.0
+  CHECKBOARD:
+    ENABLE: True
+    NMS_THR: 0.1
+    AREA_RATIO_THR: 0.01
+    BASE_PROBABILITY: 0.3
+    MAX_GROUPS: 4
+    MAX_PERMUTATIONS: 2
+    ALPHA: 3.0
+    CUT_OFF_THR: 0.3
+    INTERVAL: -0.1
+    LOCAL_CORRESPONDENCE: True
+  CAPTION:
+    ENABLE: False
+  QUEUE:
+    LENGTHS: [1024, 1024, 1024, 1024]
+    NAMES: ['clip_text_features', 'clip_image_features', 'clip_word_features', 'clip_patch_features']
