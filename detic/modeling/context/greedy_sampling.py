@@ -1,11 +1,15 @@
 import random
 import torch
-from detic.modeling.context.baseline import get_enclosing_box
 import math
 from detic.modeling.context.context_modelling import pseudo_permutations
 from detic.modeling.context.baseline import get_normed_boxes
 from .utils import multi_apply
+def get_enclosing_box(boxes):
+    # Nx4
+    x_y_min = boxes[:, :2].min(dim=0).values
+    x_y_max = boxes[:, :2].max(dim=0).values
 
+    return torch.cat([x_y_min, x_y_max])
 
 def fp16_clamp(x, min=None, max=None):
     if not x.is_cuda and x.dtype == torch.float16:
