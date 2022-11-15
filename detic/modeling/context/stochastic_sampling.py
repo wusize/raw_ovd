@@ -177,7 +177,10 @@ class StochasticSampling:
         assert box_possibilities[4] == 1.0       # center box (roi) are fixed at 1.0
         seen = set()
         while True:
-            sampled_mask = torch.bernoulli(torch.from_numpy(box_possibilities)).numpy()
+            try:
+                sampled_mask = torch.bernoulli(torch.from_numpy(box_possibilities)).numpy()
+            except:
+                raise ValueError(f"Invalid box_possibilities{box_possibilities}")
             box_ids = sorted(sampled_mask.nonzero()[0].tolist())
             box_ids_str = ''.join([str(box_id) for box_id in box_ids])
             if box_ids_str not in seen:
