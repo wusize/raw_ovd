@@ -198,6 +198,7 @@ class StochasticSampling:
     def sample(self,  box, image_size):
         left_right_up_down_possibility = self._get_left_right_up_down_possibility(box, image_size)
         box_possibilities = self._get_box_possibilities(left_right_up_down_possibility)
+        box_possibilities = np.clip(box_possibilities, a_min=0.0, a_max=1.0)
         num_valid_context_boxes = int((box_possibilities > 0.0).sum()) - 1
         num_groups = min(self.max_groups, math.factorial(num_valid_context_boxes))
         random_gen = self.group_generator(box_possibilities)
