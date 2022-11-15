@@ -93,7 +93,8 @@ class BoxesCache(nn.Module):
             transforms.apply_box(image_boxes_cache[:, :4].cpu())).to(device))
         # check if in the transformed image
         cur_image_box = torch.tensor([[0., 0., cur_w, cur_h]]).to(device)
-        iof = pairwise_ioa(cached_boxes, Boxes(cur_image_box))
+        iof = pairwise_ioa(Boxes(cur_image_box), cached_boxes)
+        iof[iof < 0.3] = 0.0      # not in the current image
         cached_box_scores = iof.view(-1) * image_boxes_cache[:, 4]
         cached_boxes.clip((cur_h, cur_w))   # clip out of bound areas
 

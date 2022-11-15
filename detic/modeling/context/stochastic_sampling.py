@@ -170,6 +170,7 @@ class StochasticSampling:
                                   dtype=np.float32) > (self.cut_off_thr + self.interval)
         left_right_up_down = left_right_up_down * boundary_check.astype(np.float32)
         left_right_up_down = np.clip(left_right_up_down, a_min=0.0, a_max=self.base_probability)
+        left_right_up_down[np.isnan(left_right_up_down)] = 0.0
 
         return left_right_up_down
 
