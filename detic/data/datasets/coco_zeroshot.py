@@ -112,7 +112,9 @@ WUSIZE_SPLIT_COCO = dict(wusize_val_base=("coco/val2017", "coco/wusize/instances
                                                            "all"),
                          wusize_val_class_agnostic_base=("coco/val2017",
                                                          "coco/wusize/instances_val2017_class_agnostic_base.json",
-                                                         "all"),
+                                                         "all",
+                                                         ),
+                         cooccur_val=("coco/val2017", "coco/wusize/instances_val2017_cooccur.json", "all")
                          )
 
 _PREDEFINED_SPLITS_COCO.update(WUSIZE_SPLIT_COCO)
