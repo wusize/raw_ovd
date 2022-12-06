@@ -1,5 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 from .modeling.meta_arch import custom_rcnn
+from .modeling.meta_arch import ref_custom_rcnn
+from .modeling.roi_heads import ref_roi_heads
 from .modeling.meta_arch.proposal_network import CustomProposalNetwork
 from .modeling.roi_heads import detic_roi_heads
 from .modeling.roi_heads import res5_roi_heads, standard_roi_heads, res5_roi_heads_l1

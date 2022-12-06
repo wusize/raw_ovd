@@ -144,7 +144,7 @@ def load(name: str,
                             use_text_encoder=use_text_encoder).to(device)
         if str(device) == "cpu":
             model.float()
-        return model, None
+        return model, _transform(model.input_resolution)
 
     # patch the device names
     device_holder = torch.jit.trace(lambda: torch.ones([]).to(torch.device(device)), example_inputs=[])

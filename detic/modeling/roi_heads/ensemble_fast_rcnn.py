@@ -3,6 +3,7 @@ import torch
 from torch.nn import functional as F
 from detectron2.config import configurable
 from .detic_fast_rcnn import DeticFastRCNNOutputLayers
+from detectron2.modeling.roi_heads.fast_rcnn import fast_rcnn_inference
 import torch.nn as nn
 
 __all__ = ["EnsembleFastRCNNOutputLayers"]
@@ -70,15 +71,39 @@ class EnsembleFastRCNNOutputLayers(DeticFastRCNNOutputLayers):
 
         x_cls = self.pre_forward(x_cls)
         pseudo_words = self.pred_words(x_cls)
-        scores = self.pred_cls_score(pseudo_words)
+        scores, class_features = self.pred_cls_score(pseudo_words)
 
         x_kd = self.pre_forward(x_kd)
         pseudo_words_kd = self.pred_words_kd(x_kd)
-        scores_kd = self.pred_cls_score(pseudo_words_kd)
+        scores_kd, kd_features = self.pred_cls_score(pseudo_words_kd)
 
         predictions = dict()
         predictions.update(scores=scores)
+        predictions.update(class_features=class_features)
         predictions.update(scores_kd=scores_kd)
+        predictions.update(kd_features=kd_features)
         predictions.update(proposal_deltas=self.bbox_pred(x_cls))
 
         return predictions
+
+    def inference_with_reference(self, predictions, proposals, reference_features):
+        """
+        enable use proposal boxes
+        """
+        assert len(proposals) == 1
+        class_features = F.normalize(predictions['class_features'], dim=-1)
+        kd_features = F.normalize(predictions['kd_features'], dim=-1)
+        cls_scores = class_features @ reference_features.T
+        kd_scores = kd_features @ reference_features.T
+        scores = cls_scores * 0.7 + kd_scores * 0.3
+        scores = [scores.repeat(1, 2)]
+        boxes = self.predict_boxes(predictions, proposals)
+        image_shapes = [x.image_size for x in proposals]
+        return fast_rcnn_inference(
+            boxes,
+            scores,
+            image_shapes,
+            0.1,
+            self.test_nms_thresh,
+            20,
+        )

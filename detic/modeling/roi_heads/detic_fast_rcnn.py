@@ -36,7 +36,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         fed_loss_num_cat = 50,
         dynamic_classifier = False,
         add_image_box = False,
-        debug = False,
+        # debug = False,
         prior_prob = 0.01,
         cat_freq_path = '',
         fed_loss_freq_weight = 0.5,
@@ -53,7 +53,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         self.fed_loss_num_cat = fed_loss_num_cat
         self.dynamic_classifier = dynamic_classifier
         self.add_image_box = add_image_box
-        self.debug = debug
+        # self.debug = debug
 
         if self.use_sigmoid_ce:
             bias_value = -math.log((1 - prior_prob) / prior_prob)
@@ -91,9 +91,9 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         self.cls_score = cls_score
         self.word_pred = nn.Linear(input_size, num_words * word_embed_dim)
 
-        self.clip, _ = CLIP.load(name=clip_cfg.NAME,
-                                 use_image_encoder=clip_cfg.USE_IMAGE_ENCODER,
-                                 download_root=clip_cfg.MODEL_ROOT)
+        self.clip, self.clip_preprocess = CLIP.load(name=clip_cfg.NAME,
+                                                    use_image_encoder=clip_cfg.USE_IMAGE_ENCODER,
+                                                    download_root=clip_cfg.MODEL_ROOT)
         self.clip.init_weights()
 
         self.bbox_pred = nn.Sequential(
@@ -131,7 +131,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             'ignore_zero_cats': cfg.MODEL.ROI_BOX_HEAD.IGNORE_ZERO_CATS,
             'fed_loss_num_cat': cfg.MODEL.ROI_BOX_HEAD.FED_LOSS_NUM_CAT,
             'dynamic_classifier': cfg.MODEL.DYNAMIC_CLASSIFIER,
-            'debug': cfg.DEBUG or cfg.SAVE_DEBUG or cfg.IS_DEBUG,
+            # 'debug': cfg.DEBUG or cfg.SAVE_DEBUG or cfg.IS_DEBUG,
             'prior_prob': cfg.MODEL.ROI_BOX_HEAD.PRIOR_PROB,
             'cat_freq_path': cfg.MODEL.ROI_BOX_HEAD.CAT_FREQ_PATH,
             'fed_loss_freq_weight': cfg.MODEL.ROI_BOX_HEAD.FED_LOSS_FREQ_WEIGHT,
@@ -309,6 +309,33 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             self.test_topk_per_image,
         )
 
+    def inference_with_referecne(self, predictions, proposals, ref_image_path):
+        """
+        enable use proposal boxes
+        """
+        from PIL import Image
+        assert len(proposals) == 1
+        image = self.clip_preprocess(Image.open(ref_image_path)
+                                     ).unsqueeze(0).to(predictions['pseudo_words'].device)
+        image_features = self.clip.encode_image(image, normalize=True)   # 1xE
+        class_features = F.normalize(predictions['class_features'], dim=-1)
+        scores = [class_features @ image_features.T]
+        boxes = self.predict_boxes(predictions, proposals)
+        if self.mult_proposal_score:
+            proposal_scores = [p.get('objectness_logits') for p in proposals]
+            scores = [(s * ps[:, None]) ** 0.5
+                      for s, ps in zip(scores, proposal_scores)]
+        image_shapes = [x.image_size for x in proposals]
+        return fast_rcnn_inference(
+            boxes,
+            scores,
+            image_shapes,
+            0.0,
+            self.test_nms_thresh,
+            self.test_topk_per_image,
+        )
+
+
     def predict_boxes(self, predictions, proposals):
         if not len(proposals):
             return []
@@ -388,7 +415,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             bg_feature = None
 
         cls_scores = self.cls_score(cls_features, bg_feature)
-        return cls_scores
+        return cls_scores, cls_features
 
     def forward_clip_text(self, pseudo_words, clip_model):
         with autocast():
@@ -414,7 +441,9 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
 
         predictions = dict()
         predictions.update(pseudo_words=self.pred_words(x))
-        predictions.update(scores=self.pred_cls_score(predictions['pseudo_words']))
+        scores, class_features = self.pred_cls_score(predictions['pseudo_words'])
+        predictions.update(scores=scores)
+        predictions.update(class_features=class_features)
         predictions.update(proposal_deltas=self.bbox_pred(x))
 
         return predictions

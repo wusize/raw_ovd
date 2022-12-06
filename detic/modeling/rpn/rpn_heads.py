@@ -4,7 +4,7 @@ from typing import List
 import torch
 from torch import nn
 from detectron2.config import configurable
-
+import torch.nn.functional as F
 
 @RPN_HEAD_REGISTRY.register()
 class DetachRPNHead(StandardRPNHead):
@@ -37,6 +37,23 @@ class DetachRPNHead(StandardRPNHead):
             pred_objectness_logits.append(self._forward_objectness_logits(t))
             pred_anchor_deltas.append(self.anchor_deltas(t))
         return pred_objectness_logits, pred_anchor_deltas
+
+    def get_activation_map(self, features: List[torch.Tensor]):
+        assert not self.training
+        activation_maps = []
+        tar_size = features[0].shape[2:]
+        for x in features:
+            # if isinstance(self.conv, torch.nn.Sequential):
+            #     conv = self.conv[0]
+            # else:
+            #     conv = self.conv
+            conv = self.conv
+            t = F.interpolate(conv(x), size=tar_size)
+            activation_maps.append((t > 0.0).float())
+        activation_map = torch.cat(activation_maps, dim=1).mean(1)
+        activation_map = activation_map.clamp(max=1.0) ** 2.0
+
+        return activation_map
 
     def _forward_objectness_logits(self, feature):
         return self.objectness_logits(feature.detach())
