@@ -44,7 +44,8 @@ class CustomStandardROIHeads(StandardROIHeads):
 
     def _forward_box(self, features, proposals,
                      clip_images=None, image_info=None,
-                     resized_image_info=None, group_infos=None):
+                     resized_image_info=None, group_infos=None,
+                     reference_features=None):
         features = [features[f] for f in self.box_in_features]
         box_features = self.box_pooler(features, [x.proposal_boxes for x in proposals])
         box_features = self.box_head(box_features)
@@ -85,12 +86,17 @@ class CustomStandardROIHeads(StandardROIHeads):
         else:
             predictions = self.box_predictor(box_features)
             del box_features
-            pred_instances, _ = self.box_predictor.inference(predictions, proposals)
+            if reference_features is not None:
+                pass
+            else:
+                pred_instances, _ = self.box_predictor.inference_with_reference(
+                    predictions, proposals, reference_features)
             return pred_instances
 
     def forward(self, images, features, proposals, targets=None,
                 ann_types=None, clip_images=None, image_info=None,
-                resized_image_info=None):
+                resized_image_info=None,
+                reference_features=None):
         '''
         enable debug and image labels
         '''
@@ -109,7 +115,7 @@ class CustomStandardROIHeads(StandardROIHeads):
             losses.update(self._forward_keypoint(features, proposals))
             return proposals, losses
         else:
-            pred_instances = self._forward_box(features, proposals)
+            pred_instances = self._forward_box(features, proposals, reference_features=reference_features)
             # During inference cascaded prediction is used: the mask and keypoints heads are only
             # applied to the top scoring box detections.
             pred_instances = self.forward_with_given_boxes(features, pred_instances)

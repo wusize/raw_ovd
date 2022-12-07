@@ -447,3 +447,23 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         predictions.update(proposal_deltas=self.bbox_pred(x))
 
         return predictions
+
+    def inference_with_reference(self, predictions, proposals, reference_features):
+        """
+        enable use proposal boxes
+        """
+        assert len(proposals) == 1
+        class_features = F.normalize(predictions['class_features'], dim=-1)
+        cls_scores = class_features @ reference_features.T
+        scores = cls_scores
+        scores = [scores.repeat(1, 2)]
+        boxes = self.predict_boxes(predictions, proposals)
+        image_shapes = [x.image_size for x in proposals]
+        return fast_rcnn_inference(
+            boxes,
+            scores,
+            image_shapes,
+            0.1,
+            self.test_nms_thresh,
+            20,
+        )

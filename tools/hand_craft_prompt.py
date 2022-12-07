@@ -177,7 +177,7 @@ import json
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_version', default='ViT-B/16')
+    parser.add_argument('--model_version', default='ViT-B/32')
     parser.add_argument('--ann', default='datasets/lvis/lvis_v1_only_val_norare.json')
     parser.add_argument('--out_path', default='datasets/metadata/lvis_clip_hand_craft.npy')
     parser.add_argument('--dataset', default='lvis')
