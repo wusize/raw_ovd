@@ -249,10 +249,12 @@ class EnsembleStandardROIHeads(StandardROIHeads):
 
     def _box_forward_train(self, box_features, proposals):
         sample_types = torch.cat([p.sample_types for p in proposals], dim=0)
-
-        box_features_kd = self.box_head_kd(box_features[sample_types == 1])
-        input_box_features_kd = self.box_predictor.pre_forward(box_features_kd)
-        pseudo_words_kd = self.box_predictor.pred_words_kd(input_box_features_kd)   # a linear layer
+        if not self.context_modeling_cfg.ENABLE:
+            pseudo_words_kd = None
+        else:
+            box_features_kd = self.box_head_kd(box_features[sample_types == 1])
+            input_box_features_kd = self.box_predictor.pre_forward(box_features_kd)
+            pseudo_words_kd = self.box_predictor.pred_words_kd(input_box_features_kd)   # a linear layer
 
         box_features_cls = self.box_head(box_features[sample_types == 0])
         input_box_features_cls = self.box_predictor.pre_forward(box_features_cls)
