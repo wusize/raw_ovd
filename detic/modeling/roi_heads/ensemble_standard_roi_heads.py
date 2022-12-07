@@ -27,7 +27,7 @@ class EnsembleStandardROIHeads(StandardROIHeads):
         self.image_box_size = cfg.MODEL.ROI_BOX_HEAD.IMAGE_BOX_SIZE
 
         self.context_modeling_cfg = cfg.CONTEXT_MODELLING
-        assert self.context_modeling_cfg.ENABLE
+        # assert self.context_modeling_cfg.ENABLE
         self.cfg = cfg
         ContextModelling = getattr(context, f'{self.context_modeling_cfg.VERSION}ContextModelling')
         self.context_modeling = ContextModelling(self.context_modeling_cfg,

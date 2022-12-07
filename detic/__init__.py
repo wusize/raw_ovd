@@ -21,6 +21,7 @@ from .data.datasets import objects365
 from .data.datasets import oid
 from .data.datasets import coco_zeroshot
 from .data.datasets import coco_custom
+from .data.datasets import shelf_v0
 
 from .modeling.meta_arch.d2_deformable_detr import DeformableDetr
 from .modeling.meta_arch.custom_detrs import CustomDeformableDetr
