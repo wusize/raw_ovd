@@ -13,6 +13,7 @@ detectron2
         ├─ shelf_v0
             │-- annotations
             │-- 10
+            │-- logs_checkpoints
     ├─models
         │-- ViT-B-32.pt
         │-- coco_kd_best_34.0.pth
