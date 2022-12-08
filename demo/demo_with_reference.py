@@ -44,7 +44,7 @@ def get_parser():
     parser = argparse.ArgumentParser(description="Detectron2 demo for builtin configs")
     parser.add_argument(
         "--config-file",
-        default="configs/test/res50_fpn_lvis_2x_kd_prompt_ensemble_keeplast_inf_mask.yaml",
+        default="configs/test/infer_with_reference.yaml",
         metavar="FILE",
         help="path to config file",
     )
@@ -55,7 +55,13 @@ def get_parser():
         "or a single glob pattern such as 'directory/*.jpg'",
     )
     parser.add_argument(
+        "--reference",
+        help="path/to/image/or/folder/of/images;text description",
+        default=r";carton board box"
+    )
+    parser.add_argument(
         "--output",
+        default=r"G:\data\boxes_results_text",
         help="A file or directory to save output visualizations. "
         "If not given, will show output in an OpenCV window.",
     )
@@ -63,15 +69,14 @@ def get_parser():
     parser.add_argument(
         "--confidence-threshold",
         type=float,
-        default=0.5,
+        default=0.3,
         help="Minimum score for instance predictions to be shown",
     )
     parser.add_argument(
         "--opts",
         help="Modify config options using the command-line 'KEY VALUE' pairs",
-        default=["MODEL.WEIGHTS", "models/best_lvis_hand_craft_19.2.pth",
-                 # "MODEL.META_ARCHITECTURE", "RefCustomRCNN"
-                 # "MODEL.ROI_HEADS", "RefEnsembleStandardROIHeads"
+        default=[
+                #"MODEL.WEIGHTS", r"G:\results\model_finetune.pth",
                  ],
         nargs=argparse.REMAINDER,
     )
@@ -88,7 +93,7 @@ if __name__ == "__main__":
     cfg = setup_cfg(args)
 
     demo = CustomVisualizationDemo(cfg)
-
+    os.makedirs(args.output, exist_ok=True)
     if args.input:
         if len(args.input) == 1:
             args.input = glob.glob(os.path.expanduser(args.input[0]))
@@ -97,7 +102,7 @@ if __name__ == "__main__":
             # use PIL, to be consistent with evaluation
             img = read_image(path, format="BGR")
             start_time = time.time()
-            predictions, visualized_output = demo.run_on_image(img, r"G:\data\boxes_ref;box")
+            predictions, visualized_output = demo.run_on_image(img, args.reference)
             logger.info(
                 "{}: {} in {:.2f}s".format(
                     path,

@@ -43,7 +43,7 @@ def get_parser():
     parser = argparse.ArgumentParser(description="Detectron2 demo for builtin configs")
     parser.add_argument(
         "--config-file",
-        default="configs/test/infer_coco.yaml",
+        default="configs/test/infer_shelf_v0.yaml",
         metavar="FILE",
         help="path to config file",
     )
@@ -55,6 +55,7 @@ def get_parser():
     )
     parser.add_argument(
         "--output",
+        default=r"G:\data\boxes_results_shelfv0",
         help="A file or directory to save output visualizations. "
         "If not given, will show output in an OpenCV window.",
     )
@@ -68,7 +69,7 @@ def get_parser():
     parser.add_argument(
         "--opts",
         help="Modify config options using the command-line 'KEY VALUE' pairs",
-        default=["MODEL.WEIGHTS", "models/coco_kd_best_34.0.pth"],
+        default=[],
         nargs=argparse.REMAINDER,
     )
     return parser
@@ -84,6 +85,7 @@ if __name__ == "__main__":
     cfg = setup_cfg(args)
 
     demo = VisualizationDemo(cfg)
+    os.makedirs(args.output, exist_ok=True)
 
     if args.input:
         if len(args.input) == 1:

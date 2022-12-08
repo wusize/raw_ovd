@@ -51,7 +51,7 @@ class EnsembleFastRCNNOutputLayers(DeticFastRCNNOutputLayers):
             transfer_factor = self.cfg.MODEL.ROI_BOX_HEAD.TRANSFER
             probs = (probs ** transfer_factor) * (probs_kd ** (1.0 - transfer_factor))
         else:
-            # assert (self.is_base > 0.0).sum() < self.num_classes
+            assert (self.is_base > 0.0).sum() < self.num_classes
             is_base = torch.cat([
                 (self.is_base.view(-1) > 1e-4).float(),
                 self.is_base.new_ones(1)])  # C + 1
@@ -95,7 +95,9 @@ class EnsembleFastRCNNOutputLayers(DeticFastRCNNOutputLayers):
         kd_features = F.normalize(predictions['kd_features'], dim=-1)
         cls_scores = class_features @ reference_features.T
         kd_scores = kd_features @ reference_features.T
-        scores = cls_scores * 0.7 + kd_scores * 0.3
+        assert self.cfg.MODEL.ROI_BOX_HEAD.TRANSFER > 0.0
+        transfer_factor = self.cfg.MODEL.ROI_BOX_HEAD.TRANSFER
+        scores = cls_scores * transfer_factor + kd_scores * (1.0 - transfer_factor)
         scores = [scores.repeat(1, 2)]
         boxes = self.predict_boxes(predictions, proposals)
         image_shapes = [x.image_size for x in proposals]
@@ -103,7 +105,7 @@ class EnsembleFastRCNNOutputLayers(DeticFastRCNNOutputLayers):
             boxes,
             scores,
             image_shapes,
-            0.1,
+            self.test_score_thresh,
             self.test_nms_thresh,
-            20,
+            self.test_topk_per_image,
         )

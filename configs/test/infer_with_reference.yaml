@@ -1,0 +1,33 @@
+_BASE_: "./base_res50_fpn_lvis_2x.yaml"
+MODEL:
+  META_ARCHITECTURE: "RefCustomRCNN"
+  BACKBONE:
+    FREEZE_AT: 5
+  MASK_ON: False
+  WEIGHTS: "models/res50_fpn_soco_star_400_ensemble.pkl"
+  ROI_HEADS:
+    NUM_CLASSES: 2
+    SCORE_THRESH_TEST: 0.001
+    NAME: EnsembleStandardROIHeads
+  ROI_BOX_HEAD:
+    NORM_TEMP: 40.0
+    TRANSFER: 0.70
+    MASK_VALUE: -10000000.0
+    ALL_ENCODER: True
+    IGNORE_ZERO_CATS: False
+    CAT_FREQ_PATH: ""
+    ZEROSHOT_WEIGHT_PATH: "datasets/metadata/shelf_v0_clip_hand_craft.npy"
+  CLIP:
+    USE_IMAGE_ENCODER: False
+CONTEXT_MODELLING:
+  ENABLE: False
+TEST:
+  DETECTIONS_PER_IMAGE: 100
+  EVAL_PERIOD: 1000000000000000
+DATASETS:
+  TRAIN: ('shelf_train',)
+  TEST: ('shelf_val',)
+SOLVER:
+  STEPS: (1500, 2000)
+  MAX_ITER: 2250
+  CHECKPOINT_PERIOD: 10000
