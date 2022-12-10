@@ -40,9 +40,9 @@ MODEL.WEIGHTS path/to/the/model/pretrained/on/lvis
 ```
 python demo/demo.py --config-file configs/test/infer_shelf_v0.yaml \
 --input path/to/the/images --output path/to/the/output/directories \
---opts MODEL.WEIGHTS path/to/the/model
+--opts MODEL.WEIGHTS path/to/the/model  # MODEL.ROI_BOX_HEAD.ZEROSHOT_WEIGHT_PATH path/to/prompts
 ```
-### Infer with reference
+### Infer with reference  (Deprecated!)
 ```
 python demo/demo_with_reference.py --config-file configs/test/infer_with_reference.yaml \
 --input path/to/the/images --reference path/to/image/or/folder/of/images;text description \
