@@ -382,7 +382,7 @@ class CLIP(nn.Module):
     def init_weights(self, fix_params=True):
         print(f'Initiate clip parameters by loading {self.state_file}', flush=True)
         print(f'Input resolution: {self.input_resolution}', flush=True)
-        state_dict = torch.jit.load(self.state_file).state_dict()
+        state_dict = torch.jit.load(self.state_file, map_location='cpu').state_dict()
         self.load_state_dict(state_dict, strict=False)
         if fix_params:
             self.eval()
