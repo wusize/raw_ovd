@@ -349,7 +349,7 @@ class ContextModelling(nn.Module):
                                                  input_to_clip, seqs_split_by_group,
                                                  normed_boxes_split_by_perms,
                                                  num_heads=clip_model.visual.num_heads,
-                                                 grid_size=clip_input_size // 32,
+                                                 grid_size=clip_model.visual.pe_grid_size,
                                                  use_attn_mask=self.cfg.USE_ATTN_MASK)
         storage.put_scalar("contrast_learning_time/generate_attn_mask",
                            np.float32(time() - tik))
