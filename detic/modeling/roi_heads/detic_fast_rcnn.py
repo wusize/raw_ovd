@@ -149,6 +149,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         """
         enable advanced loss
         """
+        import pdb; pdb.set_trace()
         scores, proposal_deltas = predictions.pop('scores'), predictions.pop('proposal_deltas')
         assert scores.shape[0] == proposal_deltas.shape[0]
         if scores.shape[0] == 0:
