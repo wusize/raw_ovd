@@ -19,6 +19,8 @@ detectron2
                 │-- zhiyuan_objv2_val.json
     ├─models
         │-- ViT-B-32.pt
+        │-- ViT-L-14.pt
+        │-- res50_fpn_soco_star_400_ensemble.pkl
         │-- coco_kd_best_34.0.pth
         │-- lvis_kd_best_22.8.pth
 ```
@@ -52,4 +54,14 @@ Obtain the
 ```
 python train_net.py --num-gpus 8 --config-file configs/sampling/reduce_num_of_regions.yaml \\
 MODEL.WEIGHTS path/to/the/soco_pretrained_model.pkl
+```
+
+## Rebuttal
+Put `ViT-L-14.pt` and `res50_fpn_soco_star_400_ensemble.pkl` under `models/`.
+```
+cd models
+wget https://www.dropbox.com/s/49j5kh1z1e8v31j/res50_fpn_soco_star_400_ensemble.pkl?dl=0
+```
+```
+python train_net.py --num-gpus 8 --config-file configs/rebuttal/res50_fpn_lvis_2x_kd_vild_ensemble_keep_last_inf_mask_l14.yaml
 ```

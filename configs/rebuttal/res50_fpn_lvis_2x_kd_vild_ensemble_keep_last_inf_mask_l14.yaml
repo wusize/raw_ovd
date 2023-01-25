@@ -1,0 +1,53 @@
+_BASE_: "./base_res50_fpn_lvis_2x.yaml"
+MODEL:
+  WEIGHTS: "models/res50_fpn_soco_star_400_ensemble.pkl"
+  ROI_HEADS:
+    SCORE_THRESH_TEST: 0.0001
+    NAME: EnsembleStandardROIHeads
+  ROI_BOX_HEAD:
+    WORD_EMBED_DIM: 768
+    MASK_VALUE: -100000000000000000000.0
+    MASK_FOR_NEG: False
+    ENSEMBLE_FACTOR: 0.66666666666666
+    DROP_LAST: False
+    IGNORE_ZERO_CATS: True    # no need for ensemble
+    ALL_ENCODER: True
+    ZEROSHOT_WEIGHT_DIM: 768
+    ZEROSHOT_WEIGHT_PATH: 'datasets/metadata/lvis_v1_clip_vild_vit_l14.npy'
+  CLIP:
+    NAME: 'ViT-L/14'
+    USE_IMAGE_ENCODER: True
+
+CONTEXT_MODELLING:
+  OUT_DIM: 768
+  ENABLE: True
+  CONTRAST_LOSS_WEIGHT: 1.0
+  TOKEN_LOSS_WEIGHT: 0.1
+  TOPK: 500
+  OBJECTNESS_THR: 0.85
+  SHAPE_RATIO_THR: 0.25
+  POSITIONAL_ENCODING: True
+  CE_TEMP: 20.0
+  TOKEN_TEMP: 30.0
+  CHECKBOARD:
+    ENABLE: True
+    NMS_THR: 0.1
+    AREA_RATIO_THR: 0.01
+    BASE_PROBABILITY: 0.3
+    MAX_GROUPS: 4
+    MAX_PERMUTATIONS: 2
+    ALPHA: 3.0
+    CUT_OFF_THR: 0.3
+    INTERVAL: -0.1
+    LOCAL_CORRESPONDENCE: True
+  CAPTION:
+    ENABLE: False
+  QUEUE:
+    LENGTHS: [2048, 2048, 2048, 2048]
+    NAMES: ['clip_text_features', 'clip_image_features', 'clip_word_features', 'clip_patch_features']
+TEST:
+  EVAL_PERIOD: 30000
+DATALOADER:
+  FILTER_EMPTY_ANNOTATIONS: False
+SOLVER:
+  CHECKPOINT_PERIOD: 150000
