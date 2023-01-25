@@ -260,7 +260,7 @@ class EnsembleStandardROIHeads(StandardROIHeads):
 
         storage = get_event_storage()
         tik = time()
-        scores = self.box_predictor.pred_cls_score(pseudo_words_cls)
+        scores, _ = self.box_predictor.pred_cls_score(pseudo_words_cls)
         storage.put_scalar('time/pred_cls', time() - tik)
         proposal_deltas = self.box_predictor.bbox_pred(input_box_features_cls)
         predictions = dict(kd_pseudo_words=pseudo_words_kd,
