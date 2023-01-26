@@ -1,0 +1,54 @@
+_BASE_: "./base_res50_fpn_lvis_2x.yaml"
+MODEL:
+  WEIGHTS: "models/res50_fpn_soco_star_400_ensemble.pkl"
+  ROI_HEADS:
+    NAME: EnsembleStandardROIHeads
+    SCORE_THRESH_TEST: 0.01
+  ROI_BOX_HEAD:
+    MASK_VALUE: -100000000000000000000.0
+    MASK_FOR_NEG: False
+    DROP_LAST: False
+    ENSEMBLE_FACTOR: 0.6666666666666
+    ALL_ENCODER: True
+    ZEROSHOT_WEIGHT_PATH: 'datasets/metadata/lvis_v1_clip_prompt_name.npy'
+    IGNORE_ZERO_CATS: False
+    USE_SIGMOID_CE: True
+    USE_FED_LOSS: True
+    NORM_TEMP: 50.0
+    LEARN_BG: False
+  CLIP:
+    USE_IMAGE_ENCODER: True
+
+CONTEXT_MODELLING:
+  ENABLE: True
+  CONTRAST_LOSS_WEIGHT: 1.0
+  TOKEN_LOSS_WEIGHT: 0.1
+  TOPK: 500
+  OBJECTNESS_THR: 0.85
+  SHAPE_RATIO_THR: 0.25
+  POSITIONAL_ENCODING: True
+  CE_TEMP: 20.0
+  TOKEN_TEMP: 30.0
+  CHECKBOARD:
+    ENABLE: True
+    NMS_THR: 0.1
+    AREA_RATIO_THR: 0.01
+    BASE_PROBABILITY: 0.3
+    MAX_GROUPS: 4
+    MAX_PERMUTATIONS: 2
+    ALPHA: 3.0
+    CUT_OFF_THR: 0.3
+    INTERVAL: -0.1
+    LOCAL_CORRESPONDENCE: True
+  CAPTION:
+    ENABLE: False
+  QUEUE:
+    LENGTHS: [1024, 1024, 1024, 1024]
+    NAMES: ['clip_text_features', 'clip_image_features', 'clip_word_features', 'clip_patch_features']
+TEST:
+  EVAL_PERIOD: 10000
+DATALOADER:
+  FILTER_EMPTY_ANNOTATIONS: False
+SOLVER:
+  CHECKPOINT_PERIOD: 10000000000
+OUTPUT_DIR: "./output/Detic-final2/auto"
