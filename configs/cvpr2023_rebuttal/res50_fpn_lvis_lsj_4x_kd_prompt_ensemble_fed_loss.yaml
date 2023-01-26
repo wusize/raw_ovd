@@ -1,0 +1,10 @@
+_BASE_: "./res50_fpn_lvis_lsj_4x_kd_prompt_ensemble.yaml"
+MODEL:
+  ROI_HEADS:
+    SCORE_THRESH_TEST: 0.01
+  ROI_BOX_HEAD:
+    IGNORE_ZERO_CATS: False
+    USE_SIGMOID_CE: True
+    USE_FED_LOSS: True
+    NORM_TEMP: 50.0
+    LEARN_BG: False
