@@ -3,7 +3,7 @@ MODEL:
   WEIGHTS: "models/res50_fpn_soco_star_400_ensemble.pkl"
   ROI_HEADS:
     NAME: EnsembleStandardROIHeads
-    SCORE_THRESH_TEST: 0.01
+    SCORE_THRESH_TEST: 0.05
   ROI_BOX_HEAD:
     MASK_VALUE: -100000000000000000000.0
     MASK_FOR_NEG: False
