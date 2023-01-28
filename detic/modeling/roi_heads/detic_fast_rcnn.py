@@ -411,7 +411,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
     def pred_cls_score(self, pseudo_words, **kwargs):
         clip_model = self.clip
         if pseudo_words.shape[0] == 0:
-            return pseudo_words.new_zeros(0, self.num_classes + 1)
+            return pseudo_words.new_zeros(0, self.num_classes + 1), None
         clip_model.eval()
         cls_features = self.forward_clip_text(pseudo_words, clip_model)
         if self.cfg.MODEL.ROI_BOX_HEAD.WORD_BACKGROUND:
