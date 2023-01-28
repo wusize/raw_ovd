@@ -172,6 +172,7 @@ class CustomStandardROIHeads(StandardROIHeads):
         sample_types = torch.cat([p.sample_types for p in proposals], dim=0)
         storage = get_event_storage()
         tik = time()
+        import pdb; pdb.set_trace()
         scores, _ = self.box_predictor.pred_cls_score(pseudo_words[sample_types == 0])
         storage.put_scalar('time/pred_cls', time() - tik)
         proposal_deltas = self.box_predictor.bbox_pred(input_box_features[sample_types == 0])
@@ -202,7 +203,7 @@ class CustomStandardROIHeads(StandardROIHeads):
         box_features = self.box_head(box_features)
         box_features = self.box_predictor.pre_forward(box_features)
         pseudo_words = self.box_predictor.pred_words(box_features)  # Nx1024 -> Nx4x512
-        scores, _ = self.box_predictor.pred_cls_score(pseudo_words)[..., :-1]  # discard bg
+        scores = self.box_predictor.pred_cls_score(pseudo_words)[0][..., :-1]  # discard bg
         targets = torch.zeros_like(scores)
         loss_weights = torch.ones_like(scores)
         for i in range(num_imgs):
