@@ -172,7 +172,7 @@ class CustomStandardROIHeads(StandardROIHeads):
         sample_types = torch.cat([p.sample_types for p in proposals], dim=0)
         storage = get_event_storage()
         tik = time()
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         scores, _ = self.box_predictor.pred_cls_score(pseudo_words[sample_types == 0])
         storage.put_scalar('time/pred_cls', time() - tik)
         proposal_deltas = self.box_predictor.bbox_pred(input_box_features[sample_types == 0])
