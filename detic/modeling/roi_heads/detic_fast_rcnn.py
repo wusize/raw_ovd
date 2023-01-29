@@ -93,13 +93,11 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         if word_pred_layers == 1:
             self.word_pred = nn.Linear(input_size, num_words * word_embed_dim)
         else:
-            cur_size = input_size
             word_pred = []
             for _ in range(word_pred_layers - 1):
-                word_pred += [nn.Linear(cur_size, num_words * word_embed_dim),
+                word_pred += [nn.Linear(input_size, input_size),
                               nn.ReLU()]
-                cur_size = num_words * word_embed_dim
-            word_pred.append(nn.Linear(cur_size, num_words * word_embed_dim))
+            word_pred.append(nn.Linear(input_size, num_words * word_embed_dim))
             self.word_pred = nn.Sequential(*word_pred)
 
         self.clip, self.clip_preprocess = CLIP.load(name=clip_cfg.NAME,
