@@ -21,29 +21,29 @@ __all__ = ["DeticFastRCNNOutputLayers"]
 class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
     @configurable
     def __init__(
-        self, 
-        input_shape: ShapeSpec,
-        *,
-        mult_proposal_score=False,
-        cls_score=None,
-        # clip settings
-        clip_cfg,
-        num_words,
-        word_embed_dim,
-        use_sigmoid_ce = False,
-        use_fed_loss = False,
-        ignore_zero_cats = False,
-        fed_loss_num_cat = 50,
-        dynamic_classifier = False,
-        add_image_box = False,
-        # debug = False,
-        prior_prob = 0.01,
-        cat_freq_path = '',
-        fed_loss_freq_weight = 0.5,
-        **kwargs,
+            self,
+            input_shape: ShapeSpec,
+            *,
+            mult_proposal_score=False,
+            cls_score=None,
+            # clip settings
+            clip_cfg,
+            num_words,
+            word_embed_dim,
+            use_sigmoid_ce=False,
+            use_fed_loss=False,
+            ignore_zero_cats=False,
+            fed_loss_num_cat=50,
+            dynamic_classifier=False,
+            add_image_box=False,
+            debug=False,
+            prior_prob=0.01,
+            cat_freq_path='',
+            fed_loss_freq_weight=0.5,
+            **kwargs,
     ):
         super().__init__(
-            input_shape=input_shape, 
+            input_shape=input_shape,
             **kwargs,
         )
         self.mult_proposal_score = mult_proposal_score
@@ -53,15 +53,15 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         self.fed_loss_num_cat = fed_loss_num_cat
         self.dynamic_classifier = dynamic_classifier
         self.add_image_box = add_image_box
-        # self.debug = debug
+        self.debug = debug
 
         if self.use_sigmoid_ce:
             bias_value = -math.log((1 - prior_prob) / prior_prob)
             nn.init.constant_(self.cls_score.bias, bias_value)
-        
+
         if self.use_fed_loss:
-            freq_weight = load_class_freq(cat_freq_path, fed_loss_freq_weight, min_count=1)   # for fed_loss
-            self.register_buffer('freq_weight', freq_weight)   # only for def loss
+            freq_weight = load_class_freq(cat_freq_path, fed_loss_freq_weight, min_count=1)  # for fed_loss
+            self.register_buffer('freq_weight', freq_weight)  # only for def loss
         else:
             self.freq_weight = None
 
@@ -75,19 +75,13 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
             self.freq_weight = torch.cat(
                 [self.freq_weight,
                  self.freq_weight.new_zeros(
-                    self.num_classes - len(self.freq_weight))]
+                     self.num_classes - len(self.freq_weight))]
             )
 
         assert (not self.dynamic_classifier) or (not self.use_fed_loss)
         input_size = input_shape.channels * (input_shape.width or 1) * (input_shape.height or 1)
 
         # clip_cfg,
-
-        self.clip, _ = CLIP.load(name=clip_cfg.NAME,
-                                 use_image_encoder=clip_cfg.USE_IMAGE_ENCODER,
-                                 download_root=clip_cfg.MODEL_ROOT)
-        self.clip.init_weights()
-
         self.num_words = num_words
         self.word_embed_dim = word_embed_dim
 
@@ -97,18 +91,28 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         self.cls_score = cls_score
         self.word_pred = nn.Linear(input_size, word_embed_dim)
 
+        self.clip, _ = CLIP.load(name=clip_cfg.NAME,
+                                 use_image_encoder=clip_cfg.USE_IMAGE_ENCODER,
+                                 download_root=clip_cfg.MODEL_ROOT)
+        self.clip.init_weights()
+
+        self.bbox_pred = nn.Sequential(
+            nn.Linear(input_size, input_size),
+            nn.ReLU(inplace=True),
+            nn.Linear(input_size, 4)
+        )
         weight_init.c2_xavier_fill(self.bbox_pred[0])
         nn.init.normal_(self.bbox_pred[-1].weight, std=0.001)
         nn.init.constant_(self.bbox_pred[-1].bias, 0)
 
         self.word_dropout = self.cfg.MODEL.ROI_BOX_HEAD.RANDOM_DROPOUT
         if self.cfg.MODEL.ROI_BOX_HEAD.MASK_FOR_POS:
-            cls_features = self.cls_score.zs_weight   # note that the last row and col is bg(0)
+            cls_features = self.cls_score.zs_weight  # note that the last row and col is bg(0)
             similarity_matrix = cls_features.T @ cls_features
             self.register_buffer('similarity_matrix', similarity_matrix)
         if self.cfg.MODEL.ROI_BOX_HEAD.WORD_BACKGROUND:
             assert self.cfg.MODEL.ROI_BOX_HEAD.LEARN_BG
-            self.bg_embedding = nn.Linear(1, 2 * num_words * word_embed_dim)   # use more words than the foreground
+            self.bg_embedding = nn.Linear(1, 2 * num_words * word_embed_dim)  # use more words than the foreground
             nn.init.xavier_uniform_(self.bg_embedding.weight)
             nn.init.constant_(self.bg_embedding.bias, 0)
 
