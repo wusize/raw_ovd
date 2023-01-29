@@ -90,14 +90,17 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         assert cls_score is not None
         self.cls_score = cls_score
         word_pred_layers = self.cfg.MODEL.ROI_BOX_HEAD.WORD_PRED_LAYERS
-        cur_size = input_size
-        word_pred = []
-        for _ in range(word_pred_layers - 1):
-            word_pred += [nn.Linear(cur_size, num_words * word_embed_dim),
-                          nn.ReLU()]
-            cur_size = num_words * word_embed_dim
-        word_pred.append(nn.Linear(cur_size, num_words * word_embed_dim))
-        self.word_pred = nn.Sequential(*word_pred)
+        if word_pred_layers == 1:
+            self.word_pred = nn.Linear(input_size, num_words * word_embed_dim)
+        else:
+            cur_size = input_size
+            word_pred = []
+            for _ in range(word_pred_layers - 1):
+                word_pred += [nn.Linear(cur_size, num_words * word_embed_dim),
+                              nn.ReLU()]
+                cur_size = num_words * word_embed_dim
+            word_pred.append(nn.Linear(cur_size, num_words * word_embed_dim))
+            self.word_pred = nn.Sequential(*word_pred)
 
         self.clip, self.clip_preprocess = CLIP.load(name=clip_cfg.NAME,
                                                     use_image_encoder=clip_cfg.USE_IMAGE_ENCODER,
