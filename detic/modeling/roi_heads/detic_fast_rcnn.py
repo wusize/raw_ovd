@@ -95,9 +95,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         del self.bbox_pred
         assert cls_score is not None
         self.cls_score = cls_score
-        word_pred_layers = self.cfg.MODEL.ROI_BOX_HEAD.WORD_PRED_LAYERS
-        if word_pred_layers == 1:
-            self.word_pred = nn.Linear(input_size, word_embed_dim)
+        self.word_pred = nn.Linear(input_size, word_embed_dim)
 
         weight_init.c2_xavier_fill(self.bbox_pred[0])
         nn.init.normal_(self.bbox_pred[-1].weight, std=0.001)
