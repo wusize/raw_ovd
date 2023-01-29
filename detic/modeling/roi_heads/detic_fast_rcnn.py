@@ -82,6 +82,12 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         input_size = input_shape.channels * (input_shape.width or 1) * (input_shape.height or 1)
 
         # clip_cfg,
+
+        self.clip, _ = CLIP.load(name=clip_cfg.NAME,
+                                 use_image_encoder=clip_cfg.USE_IMAGE_ENCODER,
+                                 download_root=clip_cfg.MODEL_ROOT)
+        self.clip.init_weights()
+
         self.num_words = num_words
         self.word_embed_dim = word_embed_dim
 
@@ -91,27 +97,8 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         self.cls_score = cls_score
         word_pred_layers = self.cfg.MODEL.ROI_BOX_HEAD.WORD_PRED_LAYERS
         if word_pred_layers == 1:
-            self.word_pred = nn.Linear(input_size, num_words * word_embed_dim)
-        else:
-            cur_size = input_size
-            word_pred = []
-            for _ in range(word_pred_layers - 1):
-                word_pred += [nn.Linear(cur_size, num_words * word_embed_dim),
-                              nn.ReLU()]
-                cur_size = num_words * word_embed_dim
-            word_pred.append(nn.Linear(cur_size, num_words * word_embed_dim))
-            self.word_pred = nn.Sequential(*word_pred)
+            self.word_pred = nn.Linear(input_size, word_embed_dim)
 
-        self.clip, self.clip_preprocess = CLIP.load(name=clip_cfg.NAME,
-                                                    use_image_encoder=clip_cfg.USE_IMAGE_ENCODER,
-                                                    download_root=clip_cfg.MODEL_ROOT)
-        self.clip.init_weights()
-
-        self.bbox_pred = nn.Sequential(
-            nn.Linear(input_size, input_size),
-            nn.ReLU(inplace=True),
-            nn.Linear(input_size, 4)
-        )
         weight_init.c2_xavier_fill(self.bbox_pred[0])
         nn.init.normal_(self.bbox_pred[-1].weight, std=0.001)
         nn.init.constant_(self.bbox_pred[-1].bias, 0)
@@ -388,7 +375,7 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         return x
 
     def pred_words(self, x):
-        pseudo_words = self.word_pred(x).view(-1, self.num_words, self.word_embed_dim)
+        pseudo_words = self.word_pred(x)  #.view(-1, self.num_words, self.word_embed_dim)
 
         return pseudo_words
 
@@ -412,39 +399,8 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         return valid_mask
 
     def pred_cls_score(self, pseudo_words, **kwargs):
-        clip_model = self.clip
-        if pseudo_words.shape[0] == 0:
-            return pseudo_words.new_zeros(0, self.num_classes + 1), None
-        clip_model.eval()
-        cls_features = self.forward_clip_text(pseudo_words, clip_model)
-        if self.cfg.MODEL.ROI_BOX_HEAD.WORD_BACKGROUND:
-            ones = pseudo_words.new_ones(1, 1)
-            bg_words = self.bg_embedding(ones).view(1, 2 * self.num_words,
-                                                    self.word_embed_dim)
-            bg_feature = self.forward_clip_text(bg_words, clip_model)
-        else:
-            bg_feature = None
-
-        cls_scores = self.cls_score(cls_features, bg_feature)
-        return cls_scores, cls_features
-
-    def forward_clip_text(self, pseudo_words, clip_model):
-        with autocast():
-            valid_mask = self._drop_word(pseudo_words.half())
-            pseudo_text, end_token_ids = clip_model.prepare_pseudo_text_tensor(
-                pseudo_words.half(), valid_mask)  # add start and stop token
-            # assert attn_mask.shape[:2] == pseudo_words.shape[:2]
-            if self.cfg.MODEL.ROI_BOX_HEAD.ALL_ENCODER:
-                cls_features = \
-                    clip_model.encode_pseudo_text(pseudo_text, end_token_ids,
-                                                  text_pe=True, normalize=True)
-            else:
-                cls_features, _, _ = \
-                    clip_model.encode_pseudo_text_endk(pseudo_text, end_token_ids,
-                                                       text_pe=True,
-                                                       stepk=12, normalize=True)
-
-        return cls_features.float()
+        cls_scores = self.cls_score(pseudo_words, None)
+        return cls_scores, pseudo_words
 
     def forward(self, x):
         x = self.pre_forward(x)

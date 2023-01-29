@@ -363,13 +363,25 @@ class ContextModelling(nn.Module):
 
         return clip_img_features.float(), clip_img_tokens.float()
 
+    @staticmethod
+    def process_embeddings(region_embeddings, preds_split_by_perms):
+        clip_word_features = F.normalize(region_embeddings, dim=-1)
+        clip_text_features = clip_word_features.split(preds_split_by_perms, dim=0)
+
+        def _average(x,):
+            x = x.mean(0)
+            return F.normalize(x, dim=0)
+        clip_text_features = torch.stack(list(map(_average, clip_text_features)))
+
+        return clip_text_features, clip_word_features
+
     def kd_clip_contrast(self,
                          group_info,
                          predictions, clip_images,
                          clip_model,
                          image_info=None):
         image_ids = [im['image_id'] for im in image_info]
-        pseudo_words = predictions.pop('kd_pseudo_words')
+        pseudo_words = predictions.pop('kd_pseudo_words')  # num x 512
         device = pseudo_words.device
         storage = get_event_storage()
         storage.put_scalar("num_proposals/contrast_proposals", np.float32(pseudo_words.shape[0]))
@@ -377,10 +389,6 @@ class ContextModelling(nn.Module):
         normed_boxes, spanned_boxes, origin_split, group_split, preds_split_by_perms,\
             seqs_split_split_by_origin, seqs_split_by_group = \
             multi_apply(process_single_image_groups, group_info, device=device)
-        positions = bbox_xyxy_to_cxcywh(torch.cat(normed_boxes, dim=0))
-        position_embeddings = self.positional_embed(positions)
-        pseudo_words = pseudo_words + position_embeddings
-        word_masks = self._drop_word(pseudo_words)
         start_id = 0
         seq_ids = []
         for g in group_info:
@@ -394,22 +402,10 @@ class ContextModelling(nn.Module):
                                        in zip(normed_boxes, preds_split_by_perms)]
         # torch.cat(normed_boxes).split(preds_split_by_perms, dim=0)
         preds_split_by_perms = [p for b in preds_split_by_perms for p in b]
-        word_sequences = pseudo_words.split(preds_split_by_perms, dim=0)
-        word_masks = word_masks.split(preds_split_by_perms, dim=0)
-        word_sequences = [seq.flatten(0, 1)[wm.flatten(0, 1)] for seq, wm in zip(word_sequences, word_masks)]
-        context_length = max([seq.shape[0] for seq in word_sequences])
+        clip_text_features, clip_word_features \
+            = self.process_embeddings(pseudo_words, preds_split_by_perms)
         tok = time()
-        clip_model.eval()
         with autocast():
-            # TODO: get local image tokens
-            pseudo_text, end_token_ids = clip_model.prepare_pseudo_text(
-                word_sequences,
-                context_length=context_length + 2)  # add start and stop token
-            clip_text_features, clip_word_tokens = \
-                clip_model.encode_pseudo_text(pseudo_text, end_token_ids,
-                                              text_pe=True, normalize=True,
-                                              return_word_tokens=True)
-            clip_text_features = clip_text_features.float()
             clip_image_features, clip_image_tokens = self._bbox_clip_image(spanned_boxes, clip_images,
                                                                            seqs_split_by_group,
                                                                            normed_boxes_split_by_perms,
@@ -471,12 +467,6 @@ class ContextModelling(nn.Module):
             clip_patch_features = F.normalize(roi_align(
                 clip_image_tokens, normed_boxes, (1, 1),
                 float(clip_image_tokens.shape[-1]), 2, True)[..., 0, 0], dim=-1)
-            num_words_per_pred = [wm.sum(-1).tolist() for wm in word_masks]
-            clip_word_features = [tk.split(spl) for (tk, spl)
-                                  in zip(clip_word_tokens, num_words_per_pred)]
-            clip_word_features = F.normalize(torch.stack([feat.mean(0).float()
-                                                          for feats in clip_word_features
-                                                          for feat in feats], dim=0), dim=-1)
             tok = time()
             storage.put_scalar("contrast_learning_time/prepare_dense_features",
                                np.float32(tok - tik))
