@@ -85,8 +85,13 @@ class CustomStandardROIHeads(StandardROIHeads):
         else:
             predictions = self.box_predictor(box_features)
             del box_features
-            pred_instances, _ = self.box_predictor.inference(predictions, proposals)
-            return pred_instances
+            pred_instances, selected_idx = self.box_predictor.inference(predictions, proposals)
+
+            return pred_instances, predictions
+
+    def _post_process_preds(self, pred_instances, selected_idx, predictions):
+        assert len(pred_instances) == 1, 'only support bs=1'
+
 
     def forward(self, images, features, proposals, targets=None,
                 ann_types=None, clip_images=None, image_info=None,
@@ -109,11 +114,12 @@ class CustomStandardROIHeads(StandardROIHeads):
             losses.update(self._forward_keypoint(features, proposals))
             return proposals, losses
         else:
-            pred_instances = self._forward_box(features, proposals)
+            pred_instances, predictions = self._forward_box(features, proposals)
             # During inference cascaded prediction is used: the mask and keypoints heads are only
             # applied to the top scoring box detections.
             pred_instances = self.forward_with_given_boxes(features, pred_instances)
-            return pred_instances, {}
+
+            return pred_instances, predictions
 
     @torch.no_grad()
     def label_and_sample_proposals(self, proposals, targets, ann_types, image_info):

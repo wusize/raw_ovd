@@ -1,6 +1,8 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 # import copy
 import math
+import pickle
+
 import torch.nn.functional as F
 from typing import Dict, List, Optional, Tuple
 import torch
@@ -82,13 +84,6 @@ class CustomRCNN(GeneralizedRCNN):
         # import pdb; pdb.set_trace()
         proposals, _ = self.proposal_generator(images, features, None)
         results, _ = self.roi_heads(images, features, proposals)
-        if self.cfg.MODEL.SAVE_PROPOSALS:
-            image_proposals = process_proposals(batched_inputs, images, proposals)
-            for img_p in image_proposals:
-                file_name = img_p['file_name']
-                with open(os.path.join(self.cfg.SAVE_DEBUG_PATH,
-                                       file_name.split('.')[0] + '.json'), 'w') as f:
-                    json.dump(img_p, f)
         if do_postprocess:
             assert not torch.jit.is_scripting(), \
                 "Scripting is not supported for postprocess."
@@ -155,8 +150,6 @@ class CustomRCNN(GeneralizedRCNN):
         tik = time()
         storage.put_scalar("time/proposal_generator", tik-tok)
 
-        resized_image_info = self.get_resized_image_info(images, batched_inputs, features)
-
         if self.roi_head_name in ['StandardROIHeads', 'CascadeROIHeads']:
             proposals, detector_losses = self.roi_heads(
                 images, features, proposals, gt_instances, clip_images=clip_images,
@@ -165,7 +158,7 @@ class CustomRCNN(GeneralizedRCNN):
             proposals, detector_losses = self.roi_heads(
                 images, features, proposals, gt_instances,
                 ann_types=ann_types, clip_images=clip_images, image_info=image_info,
-                resized_image_info=resized_image_info)
+                resized_image_info=dict())
         tok = time()
         storage.put_scalar("time/roi_heads", tok - tik)
         
@@ -190,61 +183,48 @@ class CustomRCNN(GeneralizedRCNN):
         else:
             return losses
 
-    def resize_for_image_label(self, images, batched_inputs, features):
-        batch_size = len(batched_inputs)
-        image_labels = []
-        resized_features = {k: [] for k in features.keys()}
-        image_sizes = []
-        image_tensors = []
-        for i in range(batch_size):
-            pos_ids = batched_inputs[i]['pos_category_ids']
-            if len(pos_ids) == 0:
-                continue
-            image_size = images.image_sizes[i]
-            new_image_size = (math.ceil(image_size[0] / 2),
-                              math.ceil(image_size[1] / 2))
-            image_sizes.append(new_image_size)
-            image_labels.append(pos_ids)
-            batched_shape = images.tensor.shape[2:4]
-            batched_shape = (math.ceil(batched_shape[0] / 2),
-                             math.ceil(batched_shape[1] / 2))
-            new_image = F.interpolate(images.tensor[i:i+1],  size=batched_shape,
-                                      mode='bilinear', align_corners=False)
-            image_tensors.append(new_image)
 
-        if len(image_tensors) > 0:
-            image_tensors = torch.cat(image_tensors)
-            resized_images = ImageList(tensor=image_tensors, image_sizes=image_sizes)
-            resized_features = self.forward_backbone(image_tensors)
+@META_ARCH_REGISTRY.register()
+class CustomRCNNGT(CustomRCNN):
+    def inference(
+            self,
+            batched_inputs: Tuple[Dict[str, torch.Tensor]],
+            detected_instances: Optional[List[Instances]] = None,
+            do_postprocess: bool = True,
+    ):
+        assert not self.training
+        assert detected_instances is None
+
+        images = self.preprocess_image(batched_inputs)
+        features = self.backbone(images.tensor)
+        # import pdb; pdb.set_trace()
+        # proposals, _ = self.proposal_generator(images, features, None)
+        proposals = [self.gt2prs(b['instances'].to(self.device)) for b in batched_inputs]
+        results, predictions = self.roi_heads(images, features, proposals)
+
+        self.save_class_features(batched_inputs, predictions['class_features'])
+
+        if do_postprocess:
+            assert not torch.jit.is_scripting(), \
+                "Scripting is not supported for postprocess."
+            return CustomRCNN._postprocess(
+                results, batched_inputs, images.image_sizes)
         else:
-            resized_images = []
+            return results
 
-        return dict(images=resized_images,
-                    image_labels=image_labels,
-                    features=resized_features)
+    def gt2prs(self, gts):
+        num = len(gts)
+        gts.proposal_boxes = gts.gt_boxes
+        gts.objectness_logits = 20 * torch.ones(num).to(self.device)
+        gts.remove('gt_boxes')
 
-    def get_resized_image_info(self, images, batched_inputs, features):
-        if not self.training or not self.cfg.MODEL.WITH_IMAGE_LABELS:
-            return dict()
-        resized_image_info = \
-            self.resize_for_image_label(images, batched_inputs, features)
-        resized_images, resized_features = resized_image_info['images'], resized_image_info['features']
-        new_proposals = []
-        if len(resized_images) > 0:
-            with torch.no_grad():
-                pred_proposals, _ = self.proposal_generator(
-                    resized_images, resized_features, None, ann_types=[], return_loss=False)
-            for p in pred_proposals:
-                if len(p) > 0:
-                    new_proposals.append(p)
-                else:
-                    h, w = p.image_size
-                    image_box = torch.tensor([[0.0, 0.0, w - 1.0, h - 1.0]], device=self.device)
-                    img_proposal = Instances(image_size=p.image_size,
-                                             proposal_boxes=Boxes(image_box),
-                                             objectness_logits=22.3 * torch.ones(1, device=self.device))
-                    new_proposals.append(img_proposal)
+        return gts
 
-        resized_image_info.update(proposals=new_proposals)
-
-        return resized_image_info
+    def save_class_features(self, batched_inputs, class_features):
+        image_id = batched_inputs[0]['image_id']
+        gt_classes = batched_inputs[0]['instances'].gt_classes.numpy()
+        class_features = class_features.cpu().numpy()
+        save_path = os.path.join(self.cfg.SAVE_DEBUG_PATH, f'{image_id}.pkl')
+        with open(save_path, 'wb') as f:
+            pickle.dump(dict(gt_classes=gt_classes,
+                             class_features=class_features), f)
