@@ -322,12 +322,6 @@ class WuSizeDatasetMapper(DatasetMapper):
                 dataset_dict, image_shape, transforms, proposal_topk=self.proposal_topk
             )
 
-        if not self.is_train:
-            # USER: Modify this if you want to keep them for some reason.
-            dataset_dict.pop("annotations", None)
-            dataset_dict.pop("sem_seg_file_name", None)
-            return dataset_dict
-
         if "annotations" in dataset_dict:
             self._transform_annotations(dataset_dict, transforms, image_shape)
         dataset_dict['transforms'] = transforms

@@ -65,7 +65,7 @@ def do_test(cfg, model):
                 model,
                 cfg.MODEL.TEST_CLASSIFIERS[d],
                 cfg.MODEL.TEST_NUM_CLASSES[d])
-        mapper = None if cfg.INPUT.TEST_INPUT_TYPE == 'default' \
+        mapper = DatasetMapper(cfg, False) if cfg.INPUT.TEST_INPUT_TYPE == 'default' \
             else DatasetMapper(
                 cfg, False, augmentations=build_custom_augmentation(cfg, False))
         data_loader = build_detection_test_loader(cfg, dataset_name, mapper=mapper)
