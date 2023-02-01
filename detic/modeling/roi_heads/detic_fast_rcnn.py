@@ -445,11 +445,11 @@ class DeticFastRCNNOutputLayers(FastRCNNOutputLayers):
         return cls_features.float()
 
     def forward(self, x):
-        x = self.pre_forward(x)
+        roi_features = self.pre_forward(x)
         # use clip-text to predict cls feature
 
-        predictions = dict()
-        predictions.update(pseudo_words=self.pred_words(x))
+        predictions = dict(roi_features=roi_features)
+        predictions.update(pseudo_words=self.pred_words(roi_features))
         scores, class_features = self.pred_cls_score(predictions['pseudo_words'])
         predictions.update(scores=scores)
         predictions.update(class_features=class_features)

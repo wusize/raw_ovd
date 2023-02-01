@@ -202,7 +202,7 @@ class CustomRCNNGT(CustomRCNN):
         proposals = [self.gt2prs(b['instances'].to(self.device)) for b in batched_inputs]
         results, predictions = self.roi_heads(images, features, proposals)
 
-        self.save_class_features(batched_inputs, predictions['class_features'])
+        self.save_class_features(batched_inputs, predictions['roi_features'])
 
         if do_postprocess:
             assert not torch.jit.is_scripting(), \
