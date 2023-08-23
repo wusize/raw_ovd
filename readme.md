@@ -40,14 +40,14 @@ Obtain the json files from
 
 **For LVIS**
 
-Obtain `lvis_v1_train_norare.json` from [google drive](https://drive.google.com/file/d/1ahmCUXyFAQqnlMb-ZDDSQUMnIosYqhu5/view?usp=drive_link).
+Obtain `lvis_v1_train_norare.json` from [google drive](https://drive.google.com/file/d/1ahmCUXyFAQqnlMb-ZDDSQUMnIosYqhu5/view?usp=sharing).
 
 **For checkpoints**
 
 **SOCO Pretrain**
 
-Obtain the checkpoints  [res50_fpn_soco_star_400.pkl](https://drive.google.com/file/d/1rIW9IXjWEnFZa4klZuZ5WNSchRYaOC0x/view?usp=drive_link)
-and [res50_fpn_soco_star_400_ensemble.pkl](https://drive.google.com/file/d/16-u1lj13T8TQswEx_-f5p1w8bRPA7Ifb/view?usp=drive_link). 
+Obtain the checkpoints  [res50_fpn_soco_star_400.pkl](https://drive.google.com/file/d/11mWVDePHe-u69l0PffYsECv5sTi0rXHQ/view?usp=sharing)
+and [res50_fpn_soco_star_400_ensemble.pkl](https://drive.google.com/file/d/16-u1lj13T8TQswEx_-f5p1w8bRPA7Ifb/view?usp=sharing). 
 
 Obtain the checkpoints of baron from
 [Jinsheng](https://connecthkuhk-my.sharepoint.com/:f:/g/personal/js20_connect_hku_hk/EingbMkSjIZKu8PObuGte_wBTPGOeV5M88C_Xq34qewiNQ?e=JtHRYv) 
